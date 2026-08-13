@@ -9,6 +9,8 @@ import driverRoutes from './routes/drivers.js';
 import tripRoutes from './routes/trips.js';
 import maintenanceRoutes from './routes/maintenance.js';
 import dashboardRoutes from './routes/dashboard.js';
+import hotelRoutes from './routes/hotels.js';
+import bookingRoutes from './routes/bookings.js';
 
 const app = express();
 app.use(cors());
@@ -22,7 +24,7 @@ app.use(async (req, res, next) => {
     next();
   } catch (err) {
     console.error('Database connection error:', err);
-    next(err);
+    next();
   }
 });
 
@@ -33,6 +35,8 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/hotels', hotelRoutes);
+app.use('/api/bookings', bookingRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

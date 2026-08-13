@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 import { seedInitialData } from './seed.js';
 
 let mongoMemoryServer = null;
@@ -30,6 +29,7 @@ export async function connectDB() {
       console.log('Starting In-Memory MongoDB Server...');
       try {
         if (!mongoMemoryServer) {
+          const { MongoMemoryServer } = await import('mongodb-memory-server');
           mongoMemoryServer = await MongoMemoryServer.create({
             binary: { version: '6.0.14' }
           });

@@ -1,4 +1,5 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Vehicle from '../models/Vehicle.js';
 import User from '../models/User.js';
 import { auth, allow } from '../middleware/auth.js';
