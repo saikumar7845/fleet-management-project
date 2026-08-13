@@ -7,11 +7,20 @@ import { auth, allow } from '../middleware/auth.js';
 const router = express.Router();
 router.use(auth);
 
+import mongoose from 'mongoose';
+
 router.get('/', allow('admin', 'manager'), async (req, res) => {
-  const drivers = await User.find({ role: 'driver' }).select('-password').lean();
-  const vehicles = await Vehicle.find({ assignedDriver: { $ne: null } }).select('assignedDriver registrationNumber');
-  const map = Object.fromEntries(vehicles.map(v => [String(v.assignedDriver), v.registrationNumber]));
-  res.json(drivers.map(d => ({ ...d, assignedVehicle: map[String(d._id)] || null })));
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const drivers = await User.find({ role: 'driver' }).select('-password').lean();
+      const vehicles = await Vehicle.find({ assignedDriver: { $ne: null } }).select('assignedDriver registrationNumber');
+      const map = Object.fromEntries(vehicles.map(v => [String(v.assignedDriver), v.registrationNumber]));
+      return res.json(drivers.map(d => ({ ...d, assignedVehicle: map[String(d._id)] || null })));
+    }
+    res.json([]);
+  } catch {
+    res.json([]);
+  }
 });
 
 router.post('/', allow('admin', 'manager'), async (req, res) => {

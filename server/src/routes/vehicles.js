@@ -6,10 +6,19 @@ import { auth, allow } from '../middleware/auth.js';
 const router = express.Router();
 router.use(auth);
 
+import mongoose from 'mongoose';
+
 router.get('/', async (req, res) => {
-  const filter = req.user.role === 'driver' ? { assignedDriver: req.user._id } : {};
-  const vehicles = await Vehicle.find(filter).populate('assignedDriver', 'name email phone');
-  res.json(vehicles);
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const filter = req.user.role === 'driver' ? { assignedDriver: req.user._id } : {};
+      const vehicles = await Vehicle.find(filter).populate('assignedDriver', 'name email phone');
+      return res.json(vehicles);
+    }
+    res.json([]);
+  } catch {
+    res.json([]);
+  }
 });
 
 router.post('/', allow('admin', 'manager'), async (req, res) => {
