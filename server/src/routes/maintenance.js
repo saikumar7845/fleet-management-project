@@ -6,9 +6,19 @@ import { auth, allow } from '../middleware/auth.js';
 const router = express.Router();
 router.use(auth);
 
+import mongoose from 'mongoose';
+import { memoryData } from '../memoryStore.js';
+
 router.get('/', async (req, res) => {
-  const records = await Maintenance.find().populate('vehicle', 'registrationNumber type').sort({ serviceDate: -1 });
-  res.json(records);
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const records = await Maintenance.find().populate('vehicle', 'registrationNumber type').sort({ serviceDate: -1 });
+      return res.json(records);
+    }
+    res.json(memoryData.maintenance);
+  } catch {
+    res.json(memoryData.maintenance);
+  }
 });
 
 router.post('/', allow('admin', 'manager'), async (req, res) => {

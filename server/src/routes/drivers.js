@@ -7,7 +7,7 @@ import { auth, allow } from '../middleware/auth.js';
 const router = express.Router();
 router.use(auth);
 
-import mongoose from 'mongoose';
+import { memoryData } from '../memoryStore.js';
 
 router.get('/', allow('admin', 'manager'), async (req, res) => {
   try {
@@ -17,9 +17,9 @@ router.get('/', allow('admin', 'manager'), async (req, res) => {
       const map = Object.fromEntries(vehicles.map(v => [String(v.assignedDriver), v.registrationNumber]));
       return res.json(drivers.map(d => ({ ...d, assignedVehicle: map[String(d._id)] || null })));
     }
-    res.json([]);
+    res.json(memoryData.drivers);
   } catch {
-    res.json([]);
+    res.json(memoryData.drivers);
   }
 });
 

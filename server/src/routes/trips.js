@@ -6,10 +6,20 @@ import { auth, allow } from '../middleware/auth.js';
 const router = express.Router();
 router.use(auth);
 
+import mongoose from 'mongoose';
+import { memoryData } from '../memoryStore.js';
+
 router.get('/', async (req, res) => {
-  const filter = req.user.role === 'driver' ? { driver: req.user._id } : {};
-  const trips = await Trip.find(filter).populate('driver', 'name').populate('vehicle', 'registrationNumber type').sort({ startTime: -1 });
-  res.json(trips);
+  try {
+    if (mongoose.connection.readyState === 1) {
+      const filter = req.user.role === 'driver' ? { driver: req.user._id } : {};
+      const trips = await Trip.find(filter).populate('driver', 'name').populate('vehicle', 'registrationNumber type').sort({ startTime: -1 });
+      return res.json(trips);
+    }
+    res.json(memoryData.trips);
+  } catch {
+    res.json(memoryData.trips);
+  }
 });
 
 router.post('/', auth, async (req, res) => {

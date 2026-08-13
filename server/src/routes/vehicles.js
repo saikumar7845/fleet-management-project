@@ -6,7 +6,7 @@ import { auth, allow } from '../middleware/auth.js';
 const router = express.Router();
 router.use(auth);
 
-import mongoose from 'mongoose';
+import { memoryData } from '../memoryStore.js';
 
 router.get('/', async (req, res) => {
   try {
@@ -15,9 +15,12 @@ router.get('/', async (req, res) => {
       const vehicles = await Vehicle.find(filter).populate('assignedDriver', 'name email phone');
       return res.json(vehicles);
     }
-    res.json([]);
+    const filterVehicles = req.user.role === 'driver' 
+      ? memoryData.vehicles.filter(v => v.assignedDriver?.email === req.user.email || v.assignedDriver?.id === req.user.id || v.assignedDriver?._id === req.user.id)
+      : memoryData.vehicles;
+    res.json(filterVehicles);
   } catch {
-    res.json([]);
+    res.json(memoryData.vehicles);
   }
 });
 
