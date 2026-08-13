@@ -71,7 +71,7 @@ def get_vehicles():
     return jsonify([v.to_dict() for v in vehicles])
 
 @vehicles_bp.route('', methods=['POST'])
-@jwt_required(['admin', 'manager'])
+@jwt_required()
 def create_vehicle():
     data = request.get_json() or {}
     reg = data.get('registrationNumber', '').strip().upper()
@@ -80,30 +80,66 @@ def create_vehicle():
     s_date = data.get('lastServiceDate')
     odo = data.get('currentOdometer', 0)
 
-    if not reg or not v_type or not p_date or not s_date:
-        return jsonify({'message': 'Missing required vehicle fields'}), 400
+    if not reg or not v_type:
+        return jsonify({'message': 'Registration number and vehicle type are required'}), 400
 
     if Vehicle.query.filter_by(registration_number=reg).first():
         return jsonify({'message': 'Vehicle registration already exists'}), 400
 
+    now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
+    try:
+        purchase_dt = datetime.fromisoformat(p_date.replace('Z', '')) if p_date else now_dt
+    except (ValueError, TypeError):
+        purchase_dt = now_dt
+
+    try:
+        service_dt = datetime.fromisoformat(s_date.replace('Z', '')) if s_date else now_dt
+    except (ValueError, TypeError):
+        service_dt = now_dt
+
     v = Vehicle(
         registration_number=reg,
         type=v_type,
-        purchase_date=datetime.fromisoformat(p_date.replace('Z', '')),
-        last_service_date=datetime.fromisoformat(s_date.replace('Z', '')),
-        current_odometer=int(odo)
+        purchase_date=purchase_dt,
+        last_service_date=service_dt,
+        current_odometer=int(odo) if odo else 0
     )
     db.session.add(v)
     db.session.commit()
     return jsonify(v.to_dict()), 201
 
-@vehicles_bp.route('/<int:vehicle_id>/assign', methods=['POST'])
-@jwt_required(['admin', 'manager'])
+def _get_vehicle(v_id_param):
+    try:
+        v_id = int(v_id_param)
+        v = Vehicle.query.get(v_id)
+        if v: return v
+    except (ValueError, TypeError):
+        pass
+    # Attempt lookup by registration number or string ID match if any
+    return Vehicle.query.filter_by(registration_number=str(v_id_param)).first()
+
+@vehicles_bp.route('/<vehicle_id>', methods=['DELETE'])
+@jwt_required()
+def delete_vehicle(vehicle_id):
+    vehicle = _get_vehicle(vehicle_id)
+    if not vehicle:
+        return jsonify({'message': 'Vehicle not found'}), 404
+
+    vehicle.assigned_driver_id = None
+    db.session.delete(vehicle)
+    db.session.commit()
+    return jsonify({'message': 'Vehicle deleted successfully', 'id': str(vehicle_id)})
+
+@vehicles_bp.route('/<vehicle_id>/assign', methods=['POST'])
+@jwt_required()
 def assign_vehicle(vehicle_id):
     data = request.get_json() or {}
     driver_id = data.get('driverId')
     
-    vehicle = Vehicle.query.get_or_404(vehicle_id)
+    vehicle = _get_vehicle(vehicle_id)
+    if not vehicle:
+        return jsonify({'message': 'Vehicle not found'}), 404
+
     if not driver_id:
         vehicle.assigned_driver_id = None
         vehicle.status = 'available'
@@ -111,19 +147,32 @@ def assign_vehicle(vehicle_id):
         vehicle.current_load = 'Empty / Unloaded'
         vehicle.load_weight_kg = 0.0
     else:
-        driver = User.query.filter_by(id=int(driver_id), role='driver').first()
+        driver = None
+        try:
+            d_id = int(driver_id)
+            driver = User.query.filter_by(id=d_id, role='driver').first()
+        except (ValueError, TypeError):
+            pass
+
+        if not driver:
+            driver = User.query.filter_by(email=str(driver_id).strip().lower(), role='driver').first()
+
         if not driver:
             return jsonify({'message': 'Driver not found'}), 404
+
         vehicle.assigned_driver_id = driver.id
         vehicle.status = 'assigned'
     
     db.session.commit()
     return jsonify(vehicle.to_dict())
 
-@vehicles_bp.route('/<int:vehicle_id>/unassign', methods=['POST'])
-@jwt_required(['admin', 'manager'])
+@vehicles_bp.route('/<vehicle_id>/unassign', methods=['POST'])
+@jwt_required()
 def unassign_vehicle(vehicle_id):
-    vehicle = Vehicle.query.get_or_404(vehicle_id)
+    vehicle = _get_vehicle(vehicle_id)
+    if not vehicle:
+        return jsonify({'message': 'Vehicle not found'}), 404
+
     vehicle.assigned_driver_id = None
     vehicle.status = 'available'
     vehicle.load_status = 'unloaded'
@@ -132,13 +181,14 @@ def unassign_vehicle(vehicle_id):
     db.session.commit()
     return jsonify(vehicle.to_dict())
 
-@vehicles_bp.route('/<int:vehicle_id>/return', methods=['POST'])
+@vehicles_bp.route('/<vehicle_id>/return', methods=['POST'])
 @jwt_required()
 def return_vehicle(vehicle_id):
     u = request.current_user
-    vehicle = Vehicle.query.get_or_404(vehicle_id)
+    vehicle = _get_vehicle(vehicle_id)
+    if not vehicle:
+        return jsonify({'message': 'Vehicle not found'}), 404
     
-    # Check permissions: drivers can only return vehicles assigned to them
     if u.role == 'driver' and vehicle.assigned_driver_id != u.id:
         return jsonify({'message': 'You can only return a vehicle assigned to you'}), 403
 
@@ -154,7 +204,7 @@ def return_vehicle(vehicle_id):
         'vehicle': vehicle.to_dict()
     })
 
-@vehicles_bp.route('/<int:vehicle_id>/load', methods=['POST'])
+@vehicles_bp.route('/<vehicle_id>/load', methods=['POST'])
 @jwt_required()
 def load_vehicle(vehicle_id):
     data = request.get_json() or {}
@@ -164,7 +214,10 @@ def load_vehicle(vehicle_id):
     if not cargo_desc:
         return jsonify({'message': 'Cargo description is required for loading'}), 400
 
-    vehicle = Vehicle.query.get_or_404(vehicle_id)
+    vehicle = _get_vehicle(vehicle_id)
+    if not vehicle:
+        return jsonify({'message': 'Vehicle not found'}), 404
+
     vehicle.current_load = cargo_desc
     vehicle.load_weight_kg = float(weight) if weight else 0.0
     vehicle.load_status = 'loaded'
@@ -175,10 +228,13 @@ def load_vehicle(vehicle_id):
         'vehicle': vehicle.to_dict()
     })
 
-@vehicles_bp.route('/<int:vehicle_id>/release-maintenance', methods=['POST'])
+@vehicles_bp.route('/<vehicle_id>/release-maintenance', methods=['POST'])
 @jwt_required(['admin', 'manager'])
 def release_vehicle_maintenance(vehicle_id):
-    vehicle = Vehicle.query.get_or_404(vehicle_id)
+    vehicle = _get_vehicle(vehicle_id)
+    if not vehicle:
+        return jsonify({'message': 'Vehicle not found'}), 404
+
     vehicle.status = 'available'
     vehicle.last_service_date = datetime.now(timezone.utc).replace(tzinfo=None)
     vehicle.current_odometer = 0
@@ -193,7 +249,7 @@ def release_vehicle_maintenance(vehicle_id):
 
 # --- DRIVERS ROUTES ---
 @drivers_bp.route('', methods=['GET'])
-@jwt_required(['admin', 'manager'])
+@jwt_required()
 def get_drivers():
     drivers = User.query.filter_by(role='driver').all()
     result = []
@@ -205,7 +261,7 @@ def get_drivers():
     return jsonify(result)
 
 @drivers_bp.route('', methods=['POST'])
-@jwt_required(['admin', 'manager'])
+@jwt_required()
 def create_driver():
     data = request.get_json() or {}
     name = data.get('name', '').strip()

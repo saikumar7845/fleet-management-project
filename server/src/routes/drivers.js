@@ -4,26 +4,39 @@ import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
 import Vehicle from '../models/Vehicle.js';
 import { auth, allow } from '../middleware/auth.js';
-import { memoryData } from '../memoryStore.js';
+import { memoryData, saveMemoryData } from '../memoryStore.js';
 
 const router = express.Router();
 router.use(auth);
 
-router.get('/', allow('admin', 'manager'), async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     if (mongoose.connection.readyState === 1) {
       const drivers = await User.find({ role: 'driver' }).select('-password').lean();
       const vehicles = await Vehicle.find({ assignedDriver: { $ne: null } }).select('assignedDriver registrationNumber');
       const map = Object.fromEntries(vehicles.map(v => [String(v.assignedDriver), v.registrationNumber]));
-      return res.json(drivers.map(d => ({ ...d, assignedVehicle: map[String(d._id)] || null })));
+      return res.json(drivers.map(d => ({
+        ...d,
+        _id: String(d._id || d.id),
+        id: String(d.id || d._id),
+        assignedVehicle: map[String(d._id)] || null
+      })));
     }
-    res.json(memoryData.drivers);
+    return res.json(memoryData.drivers.map(d => ({
+      ...d,
+      _id: String(d._id || d.id),
+      id: String(d.id || d._id)
+    })));
   } catch (e) {
-    res.json(memoryData.drivers);
+    return res.json(memoryData.drivers.map(d => ({
+      ...d,
+      _id: String(d._id || d.id),
+      id: String(d.id || d._id)
+    })));
   }
 });
 
-router.post('/', allow('admin', 'manager'), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
     const { name, email, password = 'Driver@123', phone } = req.body || {};
     const cleanEmail = email ? String(email).toLowerCase().trim() : '';
@@ -35,7 +48,14 @@ router.post('/', allow('admin', 'manager'), async (req, res) => {
     if (mongoose.connection.readyState === 1) {
       const hash = await bcrypt.hash(password, 10);
       const driver = await User.create({ name, email: cleanEmail, password: hash, phone: phone || '', role: 'driver' });
-      return res.status(201).json({ id: driver._id, _id: driver._id, name: driver.name, email: driver.email, phone: driver.phone, role: driver.role });
+      return res.status(201).json({
+        id: String(driver._id),
+        _id: String(driver._id),
+        name: driver.name,
+        email: driver.email,
+        phone: driver.phone,
+        role: driver.role
+      });
     }
 
     // Memory fallback
@@ -43,10 +63,16 @@ router.post('/', allow('admin', 'manager'), async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    let count = memoryData.drivers.length + 1;
+    while (memoryData.drivers.some(d => d._id === 'd' + count || d.id === 'd' + count)) {
+      count++;
+    }
+    const shortId = 'd' + count;
+
     const hash = await bcrypt.hash(password, 10);
     const newDriver = {
-      _id: 'd-' + Date.now(),
-      id: 'd-' + Date.now(),
+      _id: shortId,
+      id: shortId,
       name,
       email: cleanEmail,
       passwordHash: hash,
@@ -58,6 +84,7 @@ router.post('/', allow('admin', 'manager'), async (req, res) => {
       assignedVehicle: null
     };
     memoryData.drivers.unshift(newDriver);
+    saveMemoryData();
     res.status(201).json(newDriver);
   } catch (e) {
     res.status(400).json({ message: e.code === 11000 ? 'Email already exists' : e.message });
@@ -98,6 +125,7 @@ router.delete('/:id', async (req, res) => {
         }
       });
       memoryData.drivers.splice(idx, 1);
+      saveMemoryData();
     }
     res.json({ message: 'Driver deleted successfully', id: req.params.id });
   } catch (e) {

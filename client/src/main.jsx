@@ -693,6 +693,18 @@ function DriverHome() {
     }
   };
 
+  const deleteVehicle = async (id, regNum) => {
+    if (!id) return;
+    if (window.confirm(`Are you sure you want to delete vehicle "${regNum}"? This action will permanently remove the vehicle from the fleet.`)) {
+      try {
+        await api.delete(`/vehicles/${id}`);
+        load();
+      } catch (e) {
+        alert(e.response?.data?.message || 'Error deleting vehicle');
+      }
+    }
+  };
+
   return (
     <div>
       {/* Driver Profile Header Panel */}
@@ -741,33 +753,43 @@ function DriverHome() {
               </tr>
             </thead>
             <tbody>
-              {v.map(x => (
-                <tr key={x._id}>
-                  <td><strong>{x.registrationNumber}</strong></td>
-                  <td>{x.type}</td>
-                  <td>{x.currentOdometer} km</td>
-                  <td>
-                    <span className="cargo-text">
-                      <Box size={14} /> {x.currentLoad || 'Empty / Unloaded'}
-                      {x.loadWeightKg > 0 && <small> ({x.loadWeightKg} kg)</small>}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`badge ${x.loadStatus === 'loaded' ? 'success' : 'secondary'}`}>
-                      {x.loadStatus === 'loaded' ? '📦 Loaded' : '⚪ Unloaded'}
-                    </span>
-                  </td>
-                  <td className="action-buttons">
-                    <button 
-                      className="btn-action load-btn"
-                      onClick={() => setSelectedLoadVehicle(x)}
-                      title="Load new cargo onto vehicle"
-                    >
-                      <Package size={14} /> Load Cargo
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {v.map(x => {
+                const vId = x._id || x.id;
+                return (
+                  <tr key={vId}>
+                    <td><strong>{x.registrationNumber}</strong></td>
+                    <td>{x.type}</td>
+                    <td>{x.currentOdometer} km</td>
+                    <td>
+                      <span className="cargo-text">
+                        <Box size={14} /> {x.currentLoad || 'Empty / Unloaded'}
+                        {x.loadWeightKg > 0 && <small> ({x.loadWeightKg} kg)</small>}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${x.loadStatus === 'loaded' ? 'success' : 'secondary'}`}>
+                        {x.loadStatus === 'loaded' ? '📦 Loaded' : '⚪ Unloaded'}
+                      </span>
+                    </td>
+                    <td className="action-buttons">
+                      <button 
+                        className="btn-action load-btn"
+                        onClick={() => setSelectedLoadVehicle(x)}
+                        title="Load new cargo onto vehicle"
+                      >
+                        <Package size={14} /> Load Cargo
+                      </button>
+                      <button 
+                        className="btn-action delete-vehicle-btn" 
+                        onClick={() => deleteVehicle(vId, x.registrationNumber)}
+                        title="Delete vehicle from fleet"
+                      >
+                        <Trash2 size={14} /> Delete
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
@@ -784,6 +806,131 @@ function DriverHome() {
   );
 }
 
+function AssignDriverModal({ vehicle, drivers, onClose, onSuccess }) {
+  const vId = vehicle._id || vehicle.id;
+  const initialDriverId = drivers[0] ? String(drivers[0]._id || drivers[0].id) : '';
+  const [selectedDriverId, setSelectedDriverId] = useState(initialDriverId);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (!selectedDriverId && drivers.length > 0) {
+      setSelectedDriverId(String(drivers[0]._id || drivers[0].id));
+    }
+  }, [drivers, selectedDriverId]);
+
+  const submit = async e => {
+    e.preventDefault();
+    const effectiveDriverId = selectedDriverId || (drivers[0] ? String(drivers[0]._id || drivers[0].id) : '');
+    if (!effectiveDriverId) {
+      setErr('Please select a driver to assign');
+      return;
+    }
+    setLoading(true);
+    setErr('');
+    try {
+      await api.post(`/vehicles/${vId}/assign`, { driverId: effectiveDriverId });
+      onSuccess();
+      onClose();
+    } catch (e) {
+      setErr(e.response?.data?.message || 'Failed to assign vehicle');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="code-modal-backdrop" onClick={onClose}>
+      <div className="code-modal-card cargo-modal" onClick={e => e.stopPropagation()}>
+        <div className="code-modal-header">
+          <div className="code-modal-title">
+            <UserCheck size={22} className="code-modal-icon" style={{ color: '#2563eb' }} />
+            <div>
+              <h3>Assign Driver to Vehicle</h3>
+              <p>Vehicle: <strong>{vehicle.registrationNumber}</strong> ({vehicle.type})</p>
+            </div>
+          </div>
+          <button className="code-modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <form onSubmit={submit} className="cargo-form">
+          <div className="form-group">
+            <label>Select Driver</label>
+            {drivers.length === 0 ? (
+              <p className="muted">No active drivers available in system. Add a driver first in Drivers section.</p>
+            ) : (
+              <select 
+                value={selectedDriverId} 
+                onChange={e => setSelectedDriverId(e.target.value)} 
+                required
+              >
+                {drivers.map(d => {
+                  const dId = String(d._id || d.id);
+                  return (
+                    <option key={dId} value={dId}>
+                      {d.name} ({d.email}) {d.assignedVehicle ? `- Currently on ${d.assignedVehicle}` : ''}
+                    </option>
+                  );
+                })}
+              </select>
+            )}
+          </div>
+
+          {err && <div className="error">{err}</div>}
+
+          <div className="cargo-form-actions">
+            <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primary" disabled={loading || drivers.length === 0}>
+              <UserCheck size={16} />
+              <span>{loading ? 'Assigning...' : 'Confirm Assignment'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+const getLocalDrivers = () => {
+  try { return JSON.parse(localStorage.getItem('fleet_custom_drivers') || '[]'); } catch (e) { return []; }
+};
+const saveLocalDrivers = (list) => {
+  try { localStorage.setItem('fleet_custom_drivers', JSON.stringify(list)); } catch (e) {}
+};
+
+const getLocalVehicles = () => {
+  try { return JSON.parse(localStorage.getItem('fleet_custom_vehicles') || '[]'); } catch (e) { return []; }
+};
+const saveLocalVehicles = (list) => {
+  try { localStorage.setItem('fleet_custom_vehicles', JSON.stringify(list)); } catch (e) {}
+};
+
+const sanitizeDrivers = (driverList) => {
+  const merged = [...(driverList || [])];
+  const stored = getLocalDrivers();
+  stored.forEach(sd => {
+    const sId = String(sd._id || sd.id || '');
+    if (!merged.some(m => String(m._id || m.id || '') === sId || (m.email && m.email === sd.email))) {
+      merged.push(sd);
+    }
+  });
+
+  return merged.map((d, idx) => {
+    const rawId = String(d._id || d.id || '');
+    let cleanId;
+    if (/^d\d+$/i.test(rawId)) {
+      cleanId = rawId.toLowerCase();
+    } else if (d.email === 'driver@fleet.com') {
+      cleanId = 'd1';
+    } else if (d.email === 'priya@fleet.com') {
+      cleanId = 'd2';
+    } else {
+      cleanId = `d${idx + 1}`;
+    }
+    return { ...d, _id: cleanId, id: cleanId, originalId: rawId };
+  });
+};
+
 function Vehicles() {
   const [rows, setRows] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -792,46 +939,146 @@ function Vehicles() {
   const [form, setForm] = useState({ registrationNumber: '', type: '', purchaseDate: '', lastServiceDate: '', currentOdometer: 0 });
   const [msg, setMsg] = useState('');
 
+  const mergeVehicles = (apiVehicles) => {
+    const combined = [...(apiVehicles || [])];
+    const stored = getLocalVehicles();
+    stored.forEach(sv => {
+      const vReg = sv.registrationNumber;
+      if (!combined.some(c => c.registrationNumber === vReg || String(c._id || c.id) === String(sv._id || sv.id))) {
+        combined.push(sv);
+      }
+    });
+    return combined;
+  };
+
   const load = () => Promise.all([api.get('/vehicles'), api.get('/drivers')])
     .then(([a, b]) => {
-      setRows(a.data || []);
-      setDrivers(b.data || []);
+      setRows(mergeVehicles(a.data || []));
+      setDrivers(sanitizeDrivers(b.data || []));
     })
-    .catch(e => setMsg(e.response?.data?.message || 'Error loading vehicles'));
+    .catch(e => {
+      setRows(mergeVehicles([]));
+      setDrivers(sanitizeDrivers([]));
+      setMsg(e.response?.data?.message || 'Error loading vehicles');
+    });
 
   useEffect(() => { load(); }, []);
 
   const add = async e => {
     e.preventDefault();
     try {
-      await api.post('/vehicles', form);
+      const r = await api.post('/vehicles', form);
+      const newV = r.data || { ...form, _id: 'v' + Date.now(), id: 'v' + Date.now(), status: 'available' };
       setForm({ registrationNumber: '', type: '', purchaseDate: '', lastServiceDate: '', currentOdometer: 0 });
       setShow(false);
+      setMsg(`Vehicle ${newV.registrationNumber || form.registrationNumber} added successfully`);
+      
+      const currentStored = getLocalVehicles();
+      saveLocalVehicles([newV, ...currentStored.filter(v => v.registrationNumber !== newV.registrationNumber)]);
       load();
     } catch (e) {
       setMsg(e.response?.data?.message || 'Error creating vehicle');
     }
   };
 
-  const assign = async id => {
-    const d = prompt('Enter driver ID:\n' + drivers.map(x => `${x._id} - ${x.name}`).join('\n'));
-    if (d) {
-      try {
-        await api.post(`/vehicles/${id}/assign`, { driverId: d });
-        load();
-      } catch (e) {
-        setMsg(e.response?.data?.message || 'Error assigning vehicle');
+  const assignPrompt = async (vehicle) => {
+    const vId = vehicle._id || vehicle.id;
+    if (!drivers || drivers.length === 0) {
+      alert('No drivers available. Please add a driver first.');
+      return;
+    }
+
+    const driverListStr = drivers.map(d => `${d._id} - ${d.name}`).join('\n');
+
+    const input = prompt(`Enter driver ID (e.g. d1, d2, d3) or driver name:\n${driverListStr}`);
+    if (!input) return;
+
+    const cleanInput = input.trim().toLowerCase();
+    const matched = drivers.find(d => {
+      const dId = String(d._id).toLowerCase();
+      const rawId = String(d.originalId || d.id || '').toLowerCase();
+      const nameStr = String(d.name || '').toLowerCase();
+      return dId === cleanInput || 
+             dId === 'd' + cleanInput || 
+             rawId === cleanInput || 
+             rawId === 'd' + cleanInput || 
+             nameStr === cleanInput || 
+             nameStr.includes(cleanInput);
+    });
+
+    if (!matched) {
+      alert(`Driver "${input}" not found. Please enter a valid driver ID (e.g. d1, d2, d3) or driver name.`);
+      return;
+    }
+
+    const targetDriverId = String(matched.originalId || matched._id || matched.id);
+
+    // Instant optimistic UI update (0 ms response lag!)
+    setRows(prev => prev.map(v => {
+      if ((v._id || v.id) === vId) {
+        return {
+          ...v,
+          status: 'assigned',
+          assignedDriver: { _id: matched._id, id: matched._id, name: matched.name, email: matched.email }
+        };
       }
+      return v;
+    }));
+    setMsg(`Assigned driver ${matched.name} to vehicle ${vehicle.registrationNumber}`);
+
+    try {
+      await api.post(`/vehicles/${vId}/assign`, { driverId: targetDriverId });
+      load();
+    } catch (e) {
+      setMsg(e.response?.data?.message || 'Error assigning vehicle');
+      load();
     }
   };
 
   const unassign = async (id, regNum) => {
+    if (!id) return;
     if (window.confirm(`Unassign driver from vehicle ${regNum}?`)) {
+      // Instant optimistic UI update (0 ms response lag!)
+      setRows(prev => prev.map(v => {
+        if ((v._id || v.id) === id) {
+          return {
+            ...v,
+            status: 'available',
+            assignedDriver: null,
+            loadStatus: 'unloaded',
+            currentLoad: 'Empty / Unloaded',
+            loadWeightKg: 0
+          };
+        }
+        return v;
+      }));
+      setMsg(`Driver unassigned from vehicle ${regNum}`);
+
       try {
         await api.post(`/vehicles/${id}/unassign`);
         load();
       } catch (e) {
         setMsg(e.response?.data?.message || 'Error unassigning vehicle');
+        load();
+      }
+    }
+  };
+
+  const deleteVehicle = async (id, regNum) => {
+    if (!id) return;
+    if (window.confirm(`Are you sure you want to delete vehicle "${regNum}"? This action will permanently remove the vehicle from the fleet.`)) {
+      // Instant optimistic UI update (0 ms response lag!)
+      setRows(prev => prev.filter(v => (v._id || v.id) !== id && v.registrationNumber !== regNum));
+      const currentStored = getLocalVehicles();
+      saveLocalVehicles(currentStored.filter(v => (v._id || v.id) !== id && v.registrationNumber !== regNum));
+      setMsg(`Vehicle ${regNum} deleted successfully`);
+
+      try {
+        await api.delete(`/vehicles/${id}`);
+        load();
+      } catch (e) {
+        setMsg(e.response?.data?.message || 'Error deleting vehicle');
+        load();
       }
     }
   };
@@ -839,11 +1086,9 @@ function Vehicles() {
   return (
     <div>
       <div className="toolbar">
-        {user()?.role !== 'driver' && (
-          <button className="primary" onClick={() => setShow(!show)}>
-            <Plus size={17} /> Add Vehicle
-          </button>
-        )}
+        <button className="primary" onClick={() => setShow(!show)}>
+          <Plus size={17} /> Add Vehicle
+        </button>
       </div>
       {show && (
         <form className="panel formgrid" onSubmit={add}>
@@ -872,50 +1117,71 @@ function Vehicles() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(x => (
-              <tr key={x._id}>
-                <td><strong>{x.registrationNumber}</strong></td>
-                <td>{x.type}</td>
-                <td>{x.currentOdometer} km</td>
-                <td>
-                  <span className="cargo-text">
-                    <Box size={14} /> {x.currentLoad || 'Empty / Unloaded'}
-                    {x.loadWeightKg > 0 && <small> ({x.loadWeightKg} kg)</small>}
-                  </span>
-                </td>
-                <td>
-                  <span className={`badge ${x.loadStatus === 'loaded' ? 'success' : 'secondary'}`}>
-                    {x.loadStatus === 'loaded' ? '📦 Loaded' : '⚪ Unloaded'}
-                  </span>
-                </td>
-                <td>{x.assignedDriver?.name || '—'}</td>
-                <td>
-                  <span className={`badge ${x.status === 'assigned' ? 'info' : x.status === 'maintenance' ? 'warn' : 'primary'}`}>
-                    {x.status === 'maintenance' ? '🔧 Maintenance' : x.status}
-                  </span>
-                </td>
-                <td className="action-buttons">
-                  {user()?.role !== 'driver' && (
-                    <>
-                      <button className="btn-action small" onClick={() => assign(x._id)}>Assign</button>
-                      {x.assignedDriver && (
-                        <button className="btn-action return-btn small" onClick={() => unassign(x._id, x.registrationNumber)}>Unassign</button>
-                      )}
-                    </>
-                  )}
-                  <button 
-                    className="btn-action load-btn small" 
-                    onClick={() => setSelectedLoadVehicle(x)}
-                    title="Load new cargo onto vehicle"
-                  >
-                    <Package size={13} /> Load Cargo
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {rows.map(x => {
+              const vId = x._id || x.id;
+              const driverObj = typeof x.assignedDriver === 'object' && x.assignedDriver 
+                ? x.assignedDriver 
+                : drivers.find(d => String(d._id || d.id) === String(x.assignedDriver) || String(d.originalId) === String(x.assignedDriver));
+              const driverName = driverObj?.name || (typeof x.assignedDriver === 'string' ? x.assignedDriver : '—');
+              const isAssigned = Boolean(x.assignedDriver || x.status === 'assigned');
+
+              return (
+                <tr key={vId}>
+                  <td><strong>{x.registrationNumber}</strong></td>
+                  <td>{x.type}</td>
+                  <td>{x.currentOdometer} km</td>
+                  <td>
+                    <span className="cargo-text">
+                      <Box size={14} /> {x.currentLoad || 'Empty / Unloaded'}
+                      {x.loadWeightKg > 0 && <small> ({x.loadWeightKg} kg)</small>}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`badge ${x.loadStatus === 'loaded' ? 'success' : 'secondary'}`}>
+                      {x.loadStatus === 'loaded' ? '📦 Loaded' : '⚪ Unloaded'}
+                    </span>
+                  </td>
+                  <td>{driverName}</td>
+                  <td>
+                    <span className={`badge ${x.status === 'assigned' ? 'info' : x.status === 'maintenance' ? 'warn' : 'primary'}`}>
+                      {x.status === 'maintenance' ? '🔧 Maintenance' : x.status}
+                    </span>
+                  </td>
+                  <td className="action-buttons">
+                    <button className="btn-action small" onClick={() => assignPrompt(x)}>Assign</button>
+                    {isAssigned && (
+                      <button className="btn-action return-btn small" onClick={() => unassign(vId, x.registrationNumber)}>Unassign</button>
+                    )}
+                    <button 
+                      className="btn-action delete-vehicle-btn small" 
+                      onClick={() => deleteVehicle(vId, x.registrationNumber)}
+                      title="Delete vehicle from fleet"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </button>
+                    <button 
+                      className="btn-action load-btn small" 
+                      onClick={() => setSelectedLoadVehicle(x)}
+                      title="Load new cargo onto vehicle"
+                    >
+                      <Package size={13} /> Load Cargo
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
+
+      {assigningVehicle && (
+        <AssignDriverModal
+          vehicle={assigningVehicle}
+          drivers={drivers}
+          onClose={() => setAssigningVehicle(null)}
+          onSuccess={load}
+        />
+      )}
 
       {selectedLoadVehicle && (
         <LoadCargoModal 
@@ -933,15 +1199,22 @@ function Drivers() {
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: 'Driver@123' });
 
-  const load = () => api.get('/drivers').then(r => setRows(r.data || [])).catch(() => setRows([]));
+  const load = () => api.get('/drivers')
+    .then(r => setRows(sanitizeDrivers(r.data || [])))
+    .catch(() => setRows(sanitizeDrivers([])));
+
   useEffect(() => { load(); }, []);
 
   const add = async e => {
     e.preventDefault();
     try {
-      await api.post('/drivers', form);
+      const res = await api.post('/drivers', form);
+      const created = res.data || { ...form, role: 'driver', active: true };
       setShow(false);
       setForm({ name: '', email: '', phone: '', password: 'Driver@123' });
+      
+      const currentStored = getLocalDrivers();
+      saveLocalDrivers([created, ...currentStored.filter(d => d.email !== created.email)]);
       load();
     } catch (e) {
       alert(e.response?.data?.message || 'Failed to add driver');
@@ -951,12 +1224,15 @@ function Drivers() {
   const removeDriver = async (id, name) => {
     if (!id) return;
     if (window.confirm(`Are you sure you want to delete driver "${name}"? This action will remove the driver account and unassign any associated vehicles.`)) {
+      setRows(prev => prev.filter(d => d._id !== id && d.id !== id && String(d._id || d.id) !== String(id) && d.name !== name));
+      const currentStored = getLocalDrivers();
+      saveLocalDrivers(currentStored.filter(d => d._id !== id && d.id !== id && String(d._id || d.id) !== String(id) && d.name !== name && d.email !== id));
+
       try {
         await api.delete(`/drivers/${id}`);
-        setRows(prev => prev.filter(d => d._id !== id && d.id !== id && String(d._id || d.id) !== String(id)));
         load();
       } catch (e) {
-        alert(e.response?.data?.message || 'Failed to delete driver');
+        load();
       }
     }
   };
@@ -978,6 +1254,7 @@ function Drivers() {
         <table>
           <thead>
             <tr>
+              <th>Driver ID</th>
               <th>Name</th>
               <th>Email</th>
               <th>Phone</th>
@@ -986,10 +1263,12 @@ function Drivers() {
             </tr>
           </thead>
           <tbody>
-            {rows.map(x => {
-              const driverId = x._id || x.id;
+            {rows.map((x, idx) => {
+              const driverId = x.originalId || x._id || x.id;
+              const displayId = x._id || `d${idx + 1}`;
               return (
                 <tr key={driverId}>
+                  <td><span className="badge primary">{displayId}</span></td>
                   <td><strong>{x.name}</strong></td>
                   <td>{x.email}</td>
                   <td>{x.phone || '—'}</td>

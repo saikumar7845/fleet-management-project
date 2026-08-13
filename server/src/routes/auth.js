@@ -123,8 +123,14 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    let count = memoryData.drivers.length + 1;
+    while (memoryData.drivers.some(d => d._id === 'd' + count || d.id === 'd' + count)) {
+      count++;
+    }
+    const shortId = 'd' + count;
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = { id: 'user-' + Date.now(), _id: 'user-' + Date.now(), name, email: cleanEmail, phone: phone || '', passwordHash: hashedPassword, password: hashedPassword, plainPassword: password, role: 'driver' };
+    const newUser = { id: shortId, _id: shortId, name, email: cleanEmail, phone: phone || '', passwordHash: hashedPassword, password: hashedPassword, plainPassword: password, role: 'driver' };
     memoryUsers.push(newUser);
     memoryData.drivers.unshift(newUser);
 

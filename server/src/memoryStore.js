@@ -255,5 +255,39 @@ export const memoryData = {
       role: 'staff',
       phone: '9000000101'
     }
-  ]
 };
+
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const DATA_FILE = path.join(__dirname, '../data.json');
+
+export const saveMemoryData = () => {
+  try {
+    fs.writeFileSync(DATA_FILE, JSON.stringify(memoryData, null, 2), 'utf-8');
+  } catch (e) {
+    console.error('Failed to save memory data file:', e.message);
+  }
+};
+
+export const loadMemoryData = () => {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const content = fs.readFileSync(DATA_FILE, 'utf-8');
+      const parsed = JSON.parse(content);
+      if (parsed.drivers) memoryData.drivers = parsed.drivers;
+      if (parsed.vehicles) memoryData.vehicles = parsed.vehicles;
+      if (parsed.trips) memoryData.trips = parsed.trips;
+      if (parsed.maintenance) memoryData.maintenance = parsed.maintenance;
+      if (parsed.hotels) memoryData.hotels = parsed.hotels;
+      if (parsed.bookings) memoryData.bookings = parsed.bookings;
+    }
+  } catch (e) {
+    console.error('Failed to load memory data file:', e.message);
+  }
+};
+
+loadMemoryData();
