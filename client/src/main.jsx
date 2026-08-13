@@ -833,8 +833,21 @@ const saveLocalVehicles = (list) => {
   try { localStorage.setItem('fleet_custom_vehicles', JSON.stringify(list)); } catch (e) {}
 };
 
+const defaultBaselineDrivers = [
+  { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002', role: 'driver', active: true, assignedVehicle: 'AP39AB1234' },
+  { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003', role: 'driver', active: true, assignedVehicle: 'AP40CD5678' }
+];
+
 const sanitizeDrivers = (driverList) => {
-  const merged = [...(driverList || [])];
+  const base = (driverList && driverList.length > 0) ? driverList : defaultBaselineDrivers;
+  const merged = [...base];
+
+  defaultBaselineDrivers.forEach(bd => {
+    if (!merged.some(m => String(m._id || m.id) === String(bd._id || bd.id) || (m.email && m.email === bd.email))) {
+      merged.push(bd);
+    }
+  });
+
   const stored = getLocalDrivers();
   stored.forEach(sd => {
     const sId = String(sd._id || sd.id || '');
@@ -1147,12 +1160,12 @@ function Vehicles() {
 }
 
 function Drivers() {
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState(() => sanitizeDrivers(defaultBaselineDrivers));
   const [show, setShow] = useState(false);
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: 'Driver@123' });
 
   const load = () => api.get('/drivers')
-    .then(r => setRows(sanitizeDrivers(r.data || [])))
+    .then(r => setRows(sanitizeDrivers(r.data)))
     .catch(() => setRows(sanitizeDrivers([])));
 
   useEffect(() => { load(); }, []);
