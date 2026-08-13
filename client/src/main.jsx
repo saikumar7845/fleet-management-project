@@ -806,91 +806,6 @@ function DriverHome() {
   );
 }
 
-function AssignDriverModal({ vehicle, drivers, onClose, onSuccess }) {
-  const vId = vehicle._id || vehicle.id;
-  const initialDriverId = drivers[0] ? String(drivers[0]._id || drivers[0].id) : '';
-  const [selectedDriverId, setSelectedDriverId] = useState(initialDriverId);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState('');
-
-  useEffect(() => {
-    if (!selectedDriverId && drivers.length > 0) {
-      setSelectedDriverId(String(drivers[0]._id || drivers[0].id));
-    }
-  }, [drivers, selectedDriverId]);
-
-  const submit = async e => {
-    e.preventDefault();
-    const effectiveDriverId = selectedDriverId || (drivers[0] ? String(drivers[0]._id || drivers[0].id) : '');
-    if (!effectiveDriverId) {
-      setErr('Please select a driver to assign');
-      return;
-    }
-    setLoading(true);
-    setErr('');
-    try {
-      await api.post(`/vehicles/${vId}/assign`, { driverId: effectiveDriverId });
-      onSuccess();
-      onClose();
-    } catch (e) {
-      setErr(e.response?.data?.message || 'Failed to assign vehicle');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="code-modal-backdrop" onClick={onClose}>
-      <div className="code-modal-card cargo-modal" onClick={e => e.stopPropagation()}>
-        <div className="code-modal-header">
-          <div className="code-modal-title">
-            <UserCheck size={22} className="code-modal-icon" style={{ color: '#2563eb' }} />
-            <div>
-              <h3>Assign Driver to Vehicle</h3>
-              <p>Vehicle: <strong>{vehicle.registrationNumber}</strong> ({vehicle.type})</p>
-            </div>
-          </div>
-          <button className="code-modal-close" onClick={onClose}><X size={18} /></button>
-        </div>
-
-        <form onSubmit={submit} className="cargo-form">
-          <div className="form-group">
-            <label>Select Driver</label>
-            {drivers.length === 0 ? (
-              <p className="muted">No active drivers available in system. Add a driver first in Drivers section.</p>
-            ) : (
-              <select 
-                value={selectedDriverId} 
-                onChange={e => setSelectedDriverId(e.target.value)} 
-                required
-              >
-                {drivers.map(d => {
-                  const dId = String(d._id || d.id);
-                  return (
-                    <option key={dId} value={dId}>
-                      {d.name} ({d.email}) {d.assignedVehicle ? `- Currently on ${d.assignedVehicle}` : ''}
-                    </option>
-                  );
-                })}
-              </select>
-            )}
-          </div>
-
-          {err && <div className="error">{err}</div>}
-
-          <div className="cargo-form-actions">
-            <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
-            <button type="submit" className="primary" disabled={loading || drivers.length === 0}>
-              <UserCheck size={16} />
-              <span>{loading ? 'Assigning...' : 'Confirm Assignment'}</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 const getLocalDrivers = () => {
   try { return JSON.parse(localStorage.getItem('fleet_custom_drivers') || '[]'); } catch (e) { return []; }
 };
@@ -1173,15 +1088,6 @@ function Vehicles() {
           </tbody>
         </table>
       </div>
-
-      {assigningVehicle && (
-        <AssignDriverModal
-          vehicle={assigningVehicle}
-          drivers={drivers}
-          onClose={() => setAssigningVehicle(null)}
-          onSuccess={load}
-        />
-      )}
 
       {selectedLoadVehicle && (
         <LoadCargoModal 
