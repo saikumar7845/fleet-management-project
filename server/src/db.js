@@ -6,31 +6,43 @@ let mongoMemoryServer = null;
 
 export async function connectDB() {
   if (mongoose.connection.readyState === 1) return;
-  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/fleet_management';
-  try {
-    await Promise.race([
-      mongoose.connect(uri, { serverSelectionTimeoutMS: 2000 }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 3000))
-    ]);
-    console.log('MongoDB connected:', uri);
-  } catch (err) {
-    if (mongoose.connection.readyState === 1) return;
-    console.log('Local MongoDB not reachable. Starting In-Memory MongoDB Server...');
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI;
+  if (uri) {
     try {
-      if (!mongoMemoryServer) {
-        mongoMemoryServer = await MongoMemoryServer.create({
-          binary: { version: '6.0.14' }
-        });
-      }
-      const memUri = mongoMemoryServer.getUri();
-      await mongoose.connect(memUri);
-      console.log('In-Memory MongoDB connected at:', memUri);
-    } catch (memErr) {
-      console.error('Failed to start In-Memory MongoDB:', memErr.message);
-      throw memErr;
+      await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
+      console.log('MongoDB connected successfully');
+      await seedInitialData(false);
+      return;
+    } catch (err) {
+      console.error('MongoDB Atlas Connection Error:', err.message);
     }
   }
-  await seedInitialData(false);
+
+  // Local / Development in-memory fallback
+  if (!process.env.VERCEL) {
+    try {
+      const localUri = 'mongodb://127.0.0.1:27017/fleet_management';
+      await mongoose.connect(localUri, { serverSelectionTimeoutMS: 1500 });
+      console.log('Local MongoDB connected');
+      await seedInitialData(false);
+      return;
+    } catch (e) {
+      console.log('Starting In-Memory MongoDB Server...');
+      try {
+        if (!mongoMemoryServer) {
+          mongoMemoryServer = await MongoMemoryServer.create({
+            binary: { version: '6.0.14' }
+          });
+        }
+        const memUri = mongoMemoryServer.getUri();
+        await mongoose.connect(memUri);
+        console.log('In-Memory MongoDB connected at:', memUri);
+        await seedInitialData(false);
+      } catch (memErr) {
+        console.error('In-Memory MongoDB start error:', memErr.message);
+      }
+    }
+  }
 }
 
 
