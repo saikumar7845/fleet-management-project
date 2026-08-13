@@ -1,9 +1,11 @@
 # Fleet Management & Vehicle Tracking System 🚛
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fsaikumar7845%2Ffleet-management-project)
+[![Live Demo](https://img.shields.io/badge/Vercel-Live%20Demo-brightgreen?style=for-the-badge&logo=vercel)](https://fleet-management-pi-six.vercel.app)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/saikumar7845/fleet-management-project)
 
-- **GitHub Repository**: [fleet-management-project](https://github.com/saikumar7845/fleet-management-project)
-- **Live Vercel Deployment**: `https://fleet-management-project.vercel.app` *(or your Vercel project URL)*
+- 🌐 **Production Deployment URL**: [https://fleet-management-pi-six.vercel.app](https://fleet-management-pi-six.vercel.app)
+- ⚡ **Production API Health**: [https://fleet-management-pi-six.vercel.app/api/health](https://fleet-management-pi-six.vercel.app/api/health)
+- 🐙 **GitHub Repository**: [https://github.com/saikumar7845/fleet-management-project](https://github.com/saikumar7845/fleet-management-project)
 
 ---
 
@@ -11,7 +13,7 @@
 - **Frontend**: React (Vite, Lucide Icons, Recharts)
 - **Backend API**: Node.js / Express (MongoDB / In-Memory DB) & Flask Python API
 - **Auth**: JWT Authentication + bcrypt password hashing
-- **Deployment**: Vercel (Configured monorepo with Serverless Functions)
+- **Deployment**: Vercel (Monorepo with Serverless Functions)
 
 ---
 
@@ -25,36 +27,18 @@
 
 ---
 
-## 🚀 Vercel Deployment Guide
+## 🔑 Demo Login Credentials
+- **Manager / Admin**: `admin@fleet.com` / `Admin@123`
+- **Driver**: `driver@fleet.com` / `Driver@123`
 
-### Option A: Automatic Import from GitHub
+---
+
+## 🚀 Vercel Deployment Instructions
+
+### Automatic GitHub Integration
 1. Go to [Vercel Dashboard](https://vercel.com/dashboard) and click **Add New > Project**.
 2. Import the GitHub repository: **`saikumar7845/fleet-management-project`**.
 3. Vercel automatically detects `vercel.json` and builds both:
    - **Frontend**: Static React build (`client/`)
    - **Backend API**: Serverless Node API (`server/src/index.js`) routed under `/api/*`
 4. Click **Deploy**.
-
----
-
-## 💻 Local Quick Start
-
-### 1. React Frontend Client
-```bash
-cd client
-npm install
-npm run dev
-```
-
-### 2. Backend Server
-```bash
-cd server
-npm install
-npm start
-```
-
----
-
-## 🔑 Demo Login Credentials
-- **Manager / Admin**: `admin@fleet.com` / `Admin@123`
-- **Driver**: `driver@fleet.com` / `Driver@123`
