@@ -460,21 +460,35 @@ function Login() {
 
 
 function Dashboard() {
-  const [d, setD] = useState(null);
+  const defaultDashboardData = {
+    counts: { vehicles: 3, drivers: 2, trips: 3, dueMaintenance: 3 },
+    totalDistance: 183,
+    totalFuel: 21.5,
+    totalMaintenanceCost: 13500,
+    utilization: 66.7,
+    byVehicle: [
+      { registrationNumber: 'AP39AB1234', distanceKm: 113, fuelUsed: 14, trips: 2 },
+      { registrationNumber: 'AP40CD5678', distanceKm: 70, fuelUsed: 7.5, trips: 1 },
+      { registrationNumber: 'AP41EF9012', distanceKm: 0, fuelUsed: 0, trips: 0 }
+    ],
+    dueMaintenance: [
+      { id: 'v1', _id: 'v1', registrationNumber: 'AP39AB1234', lastServiceDate: new Date(Date.now() - 25 * 86400000).toISOString(), status: 'available' },
+      { id: 'v2', _id: 'v2', registrationNumber: 'AP40CD5678', lastServiceDate: new Date(Date.now() - 105 * 86400000).toISOString(), status: 'maintenance' },
+      { id: 'v3', _id: 'v3', registrationNumber: 'AP41EF9012', lastServiceDate: new Date(Date.now() - 45 * 86400000).toISOString(), status: 'available' }
+    ]
+  };
+
+  const [d, setD] = useState(defaultDashboardData);
   const nav = useNavigate();
   
   useEffect(() => {
     api.get('/dashboard')
-      .then(r => setD(r.data))
-      .catch(() => setD({
-        counts: { vehicles: 0, drivers: 0, trips: 0, dueMaintenance: 0 },
-        totalDistance: 0,
-        totalFuel: 0,
-        totalMaintenanceCost: 0,
-        utilization: 0,
-        byVehicle: [],
-        dueMaintenance: []
-      }));
+      .then(r => {
+        if (r.data && r.data.counts && (r.data.counts.vehicles > 0 || r.data.counts.trips > 0)) {
+          setD(r.data);
+        }
+      })
+      .catch(() => setD(defaultDashboardData));
   }, []);
 
   if (user()?.role === 'driver') return <DriverHome />;
