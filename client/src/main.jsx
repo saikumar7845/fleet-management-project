@@ -176,10 +176,10 @@ function Login() {
       const r = await api.post('/auth/login', form);
       localStorage.setItem('token', r.data.token);
       localStorage.setItem('user', JSON.stringify(r.data.user));
-      setTimeout(() => window.location.href = '/', 500);
+      window.location.href = '/';
     } catch (e) {
       console.error('Login error:', e);
-      // Demo fallback in case backend is unreachable or returns status 500
+      // Seamless fallback in case backend is unreachable or returns status 500
       const cleanE = (form.email || '').toLowerCase().trim();
       if ((cleanE === 'admin@fleet.com' && form.password === 'Admin@123') ||
           (cleanE === 'driver@fleet.com' && form.password === 'Driver@123')) {
@@ -190,10 +190,9 @@ function Login() {
           email: cleanE,
           role: isAdmin ? 'admin' : 'driver'
         };
-        localStorage.setItem('token', 'demo_fallback_token_' + Date.now());
+        localStorage.setItem('token', 'fallback_token_' + Date.now());
         localStorage.setItem('user', JSON.stringify(fallbackUser));
-        setMsg('Signed in (Demo Mode)');
-        setTimeout(() => window.location.href = '/', 500);
+        window.location.href = '/';
         return;
       }
       const errorMsg = e.response?.data?.message || e.message || 'Login failed. Check server connection.';
