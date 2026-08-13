@@ -103,24 +103,8 @@ function Layout({ children }) {
       <main className="main-full">
         <header className="header-full">
           <div className="header-left">
-            <div className="brand-small" style={{ cursor: 'pointer' }} onClick={() => handleModeSwitch(systemMode)}>
-              {systemMode === 'hotel' ? <><Hotel style={{ color: '#a855f7' }} /> HotelOps</> : <><Truck style={{ color: '#3b82f6' }} /> FleetOps</>}
-            </div>
-
-            {/* Platform Switcher */}
-            <div className="system-switcher">
-              <button
-                className={`switcher-btn ${systemMode === 'fleet' ? 'active' : ''}`}
-                onClick={() => handleModeSwitch('fleet')}
-              >
-                <Truck size={14} /> FleetOps
-              </button>
-              <button
-                className={`switcher-btn ${systemMode === 'hotel' ? 'active' : ''}`}
-                onClick={() => handleModeSwitch('hotel')}
-              >
-                <Hotel size={14} /> HotelOps
-              </button>
+            <div className="brand-small">
+              <Truck style={{ color: '#3b82f6' }} /> FleetOps
             </div>
 
             <nav className="top-nav">
