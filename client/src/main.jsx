@@ -6,7 +6,7 @@ import { LayoutDashboard, CarFront, Users, Route as RouteIcon, Wrench, LogOut, P
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import './styles.css';
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api');
 const api = axios.create({ baseURL: API });
 
 api.interceptors.request.use(c => {

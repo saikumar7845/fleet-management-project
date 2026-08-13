@@ -5,7 +5,8 @@ import { seedInitialData } from './seed.js';
 let mongoMemoryServer = null;
 
 export async function connectDB() {
-  const uri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/fleet_management';
+  if (mongoose.connection.readyState === 1) return;
+  const uri = process.env.MONGO_URI || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/fleet_management';
   try {
     await Promise.race([
       mongoose.connect(uri, { serverSelectionTimeoutMS: 2000 }),
@@ -13,11 +14,14 @@ export async function connectDB() {
     ]);
     console.log('MongoDB connected:', uri);
   } catch (err) {
+    if (mongoose.connection.readyState === 1) return;
     console.log('Local MongoDB not reachable. Starting In-Memory MongoDB Server...');
     try {
-      mongoMemoryServer = await MongoMemoryServer.create({
-        binary: { version: '6.0.14' }
-      });
+      if (!mongoMemoryServer) {
+        mongoMemoryServer = await MongoMemoryServer.create({
+          binary: { version: '6.0.14' }
+        });
+      }
       const memUri = mongoMemoryServer.getUri();
       await mongoose.connect(memUri);
       console.log('In-Memory MongoDB connected at:', memUri);
