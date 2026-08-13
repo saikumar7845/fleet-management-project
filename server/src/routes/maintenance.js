@@ -119,12 +119,21 @@ router.delete('/:id', allow('admin', 'manager'), async (req, res) => {
     if (mongoose.connection.readyState === 1) {
       const record = await Maintenance.findByIdAndDelete(maintId);
       if (!record) return res.status(404).json({ message: 'Maintenance record not found' });
+      if (record.vehicle) {
+        await Vehicle.findByIdAndUpdate(record.vehicle, { status: 'available' });
+      }
       return res.json({ message: 'Maintenance record deleted successfully', id: maintId });
     }
 
     // Memory fallback
     const idx = memoryData.maintenance.findIndex(m => m._id === maintId || m.id === maintId || String(m._id || m.id) === String(maintId));
     if (idx !== -1) {
+      const targetM = memoryData.maintenance[idx];
+      const targetVId = targetM.vehicle?._id || targetM.vehicle?.id || targetM.vehicle;
+      const targetV = memoryData.vehicles.find(v => v._id === targetVId || v.id === targetVId || String(v._id || v.id) === String(targetVId));
+      if (targetV && targetV.status === 'maintenance') {
+        targetV.status = 'available';
+      }
       memoryData.maintenance.splice(idx, 1);
     }
     res.json({ message: 'Maintenance record deleted successfully', id: maintId });

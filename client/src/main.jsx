@@ -1226,6 +1226,18 @@ function Maintenance() {
     }
   };
 
+  const deleteMaintenance = async (maintId) => {
+    if (!window.confirm('Are you sure you want to delete this maintenance record?')) return;
+    try {
+      await api.delete(`/maintenance/${maintId}`);
+      setMsg('Maintenance record deleted successfully');
+      setRows(prev => prev.filter(x => x._id !== maintId && x.id !== maintId && String(x._id || x.id) !== String(maintId)));
+      load();
+    } catch (e) {
+      alert(e.response?.data?.message || 'Failed to delete maintenance record');
+    }
+  };
+
   // Filter maintenance records based on release status
   const filteredRows = rows.filter(x => {
     if (viewMode === 'active') {
@@ -1321,18 +1333,28 @@ function Maintenance() {
                     <td>₹{(x.cost || 0).toLocaleString()}</td>
                     <td>{x.nextServiceDate ? new Date(x.nextServiceDate).toLocaleDateString() : '—'}</td>
                     <td className="action-buttons">
-                      {!isReleased ? (
-                        <button 
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        {!isReleased ? (
+                          <button 
+                            type="button"
+                            className="btn-action load-btn small" 
+                            onClick={() => releaseMaintenance(mId, x.vehicle?.registrationNumber || '')}
+                            title="Release vehicle from maintenance back to available status"
+                          >
+                            <CheckCircle2 size={13} /> Release
+                          </button>
+                        ) : (
+                          <span className="muted" style={{ fontSize: '12px' }}>Released</span>
+                        )}
+                        <button
                           type="button"
-                          className="btn-action load-btn small" 
-                          onClick={() => releaseMaintenance(mId, x.vehicle?.registrationNumber || '')}
-                          title="Release vehicle from maintenance back to available status"
+                          className="btn-action danger small"
+                          onClick={() => deleteMaintenance(mId)}
+                          title="Delete maintenance record"
                         >
-                          <CheckCircle2 size={13} /> Release Vehicle
+                          <Trash2 size={13} /> Delete
                         </button>
-                      ) : (
-                        <span className="muted" style={{ fontSize: '12px' }}>Released</span>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 );
