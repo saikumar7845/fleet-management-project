@@ -1,10 +1,10 @@
 # Fleet Management & Vehicle Tracking System 🚛
 
-[![Live Demo](https://img.shields.io/badge/Vercel-Live%20Demo-brightgreen?style=for-the-badge&logo=vercel)](https://fleet-management-pi-six.vercel.app)
+[![Live Demo](https://img.shields.io/badge/Vercel-Live%20Demo-brightgreen?style=for-the-badge&logo=vercel)](https://fleet-management-virid-psi.vercel.app)
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/saikumar7845/fleet-management-project)
 
-- 🌐 **Production Deployment URL**: [https://fleet-management-pi-six.vercel.app](https://fleet-management-pi-six.vercel.app)
-- ⚡ **Production API Health**: [https://fleet-management-pi-six.vercel.app/api/health](https://fleet-management-pi-six.vercel.app/api/health)
+- 🌐 **Production Deployment URL**: [https://fleet-management-virid-psi.vercel.app](https://fleet-management-virid-psi.vercel.app)
+- ⚡ **Production API Health**: [https://fleet-management-virid-psi.vercel.app/api/health](https://fleet-management-virid-psi.vercel.app/api/health)
 - 🐙 **GitHub Repository**: [https://github.com/saikumar7845/fleet-management-project](https://github.com/saikumar7845/fleet-management-project)
 
 ---
