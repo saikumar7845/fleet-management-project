@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
+import { memoryData } from '../memoryStore.js';
 
 const router = express.Router();
 
@@ -31,6 +32,13 @@ router.post('/login', async (req, res) => {
     // 2. Memory store / Demo accounts fallback
     let memUser = memoryUsers.find(u => u.email === cleanEmail);
     if (!memUser) {
+      memUser = memoryData.drivers.find(u => u.email === cleanEmail);
+    }
+    if (!memUser && memoryData.users) {
+      memUser = memoryData.users.find(u => u.email === cleanEmail);
+    }
+
+    if (!memUser) {
       if (cleanEmail === 'admin@fleet.com') {
         memUser = { id: 'admin-id-1', name: 'Fleet Admin', email: 'admin@fleet.com', passwordHash: await bcrypt.hash('Admin@123', 10), role: 'admin' };
         memoryUsers.push(memUser);
@@ -41,10 +49,26 @@ router.post('/login', async (req, res) => {
     }
 
     if (memUser) {
-      const match = memUser.password ? await bcrypt.compare(password, memUser.password) : (memUser.passwordHash ? await bcrypt.compare(password, memUser.passwordHash) : false);
-      if (match || (cleanEmail === 'admin@fleet.com' && password === 'Admin@123') || (cleanEmail === 'driver@fleet.com' && password === 'Driver@123')) {
-        const token = jwt.sign({ id: memUser.id, role: memUser.role, email: memUser.email, name: memUser.name }, process.env.JWT_SECRET || 'change_this_for_demo', { expiresIn: '8h' });
-        return res.json({ token, user: { id: memUser.id, name: memUser.name, email: memUser.email, role: memUser.role } });
+      let match = false;
+      if (memUser.passwordHash) {
+        match = await bcrypt.compare(password, memUser.passwordHash).catch(() => false);
+      }
+      if (!match && memUser.password) {
+        match = await bcrypt.compare(password, memUser.password).catch(() => false);
+      }
+      if (!match && (
+        (cleanEmail === 'admin@fleet.com' && password === 'Admin@123') ||
+        (cleanEmail === 'driver@fleet.com' && password === 'Driver@123') ||
+        (memUser.plainPassword && memUser.plainPassword === password)
+      )) {
+        match = true;
+      }
+
+      if (match) {
+        const userId = memUser._id || memUser.id || 'user-' + Date.now();
+        const userRole = memUser.role || 'driver';
+        const token = jwt.sign({ id: userId, role: userRole, email: memUser.email, name: memUser.name }, process.env.JWT_SECRET || 'change_this_for_demo', { expiresIn: '8h' });
+        return res.json({ token, user: { id: userId, name: memUser.name, email: memUser.email, role: userRole } });
       }
     }
 
@@ -64,7 +88,7 @@ router.post('/login', async (req, res) => {
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password } = req.body || {};
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email and password are required' });
     }
@@ -95,13 +119,14 @@ router.post('/register', async (req, res) => {
     }
 
     // Memory store fallback
-    if (memoryUsers.some(u => u.email === cleanEmail) || cleanEmail === 'admin@fleet.com' || cleanEmail === 'driver@fleet.com') {
+    if (memoryUsers.some(u => u.email === cleanEmail) || memoryData.drivers.some(d => d.email === cleanEmail) || cleanEmail === 'admin@fleet.com' || cleanEmail === 'driver@fleet.com') {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = { id: 'user-' + Date.now(), name, email: cleanEmail, phone: phone || '', password: hashedPassword, role: 'driver' };
+    const newUser = { id: 'user-' + Date.now(), _id: 'user-' + Date.now(), name, email: cleanEmail, phone: phone || '', passwordHash: hashedPassword, password: hashedPassword, plainPassword: password, role: 'driver' };
     memoryUsers.push(newUser);
+    memoryData.drivers.unshift(newUser);
 
     const token = jwt.sign({ id: newUser.id, role: newUser.role, email: newUser.email, name: newUser.name }, process.env.JWT_SECRET || 'change_this_for_demo', { expiresIn: '8h' });
     res.status(201).json({

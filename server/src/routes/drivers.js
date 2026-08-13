@@ -43,11 +43,15 @@ router.post('/', allow('admin', 'manager'), async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    const hash = await bcrypt.hash(password, 10);
     const newDriver = {
       _id: 'd-' + Date.now(),
       id: 'd-' + Date.now(),
       name,
       email: cleanEmail,
+      passwordHash: hash,
+      password: hash,
+      plainPassword: password,
       phone: phone || '',
       role: 'driver',
       active: true,
