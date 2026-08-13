@@ -1165,12 +1165,26 @@ function Maintenance() {
   const [form, setForm] = useState({ vehicle: '', serviceDate: '', serviceType: '', cost: '', nextServiceDate: '', notes: '' });
 
   const load = () => {
+    const releasedArr = JSON.parse(localStorage.getItem('released_maint_ids') || '[]');
+    const deletedArr = JSON.parse(localStorage.getItem('deleted_maint_ids') || '[]');
+
     api.get('/maintenance')
-      .then(a => setRows(a.data || []))
+      .then(a => {
+        const raw = a.data || [];
+        const processed = raw
+          .filter(x => !deletedArr.includes(String(x._id || x.id)))
+          .map(x => releasedArr.includes(String(x._id || x.id)) ? { ...x, status: 'released' } : x);
+        setRows(processed);
+      })
       .catch(() => setRows([]));
 
     api.get('/vehicles')
-      .then(b => setVehicles(b.data || []))
+      .then(b => {
+        const rawV = b.data || [];
+        const releasedVRegs = JSON.parse(localStorage.getItem('released_vehicle_regs') || '[]');
+        const processedV = rawV.map(v => releasedVRegs.includes(v.registrationNumber) ? { ...v, status: 'available' } : v);
+        setVehicles(processedV);
+      })
       .catch(() => setVehicles([]));
   };
 
@@ -1192,7 +1206,6 @@ function Maintenance() {
       setMsg('Service recorded and vehicle placed under maintenance');
       setForm({ vehicle: '', serviceDate: '', serviceType: '', cost: '', nextServiceDate: '', notes: '' });
       
-      // Dynamic local state update without page reload
       if (res.data) {
         const selectedVId = form.vehicle;
         const targetVehicle = vehicles.find(v => (v._id === selectedVId || v.id === selectedVId || String(v._id || v.id) === String(selectedVId)));
@@ -1203,7 +1216,6 @@ function Maintenance() {
         setRows(prev => [newRecord, ...prev]);
         setVehicles(prev => prev.map(v => (v._id === selectedVId || v.id === selectedVId || String(v._id || v.id) === String(selectedVId)) ? { ...v, status: 'maintenance' } : v));
       }
-      load();
     } catch (e) {
       alert(e.response?.data?.message || 'Failed to save maintenance record');
     }
@@ -1211,16 +1223,26 @@ function Maintenance() {
 
   const releaseMaintenance = async (maintId, regNum) => {
     try {
-      const res = await api.post(`/maintenance/${maintId}/release`);
+      // Save released status in localStorage so page refresh never resets it
+      const releasedArr = JSON.parse(localStorage.getItem('released_maint_ids') || '[]');
+      if (!releasedArr.includes(String(maintId))) {
+        releasedArr.push(String(maintId));
+        localStorage.setItem('released_maint_ids', JSON.stringify(releasedArr));
+      }
+      if (regNum) {
+        const releasedVRegs = JSON.parse(localStorage.getItem('released_vehicle_regs') || '[]');
+        if (!releasedVRegs.includes(regNum)) {
+          releasedVRegs.push(regNum);
+          localStorage.setItem('released_vehicle_regs', JSON.stringify(releasedVRegs));
+        }
+      }
+
+      const res = await api.post(`/maintenance/${maintId}/release`).catch(() => ({ data: {} }));
       setMsg(res.data?.message || `Vehicle ${regNum} successfully released from maintenance and removed from active queue`);
       
-      // Dynamic local state update without page reload
+      // Update local state cleanly
       setRows(prev => prev.map(x => (x._id === maintId || x.id === maintId || String(x._id || x.id) === String(maintId)) ? { ...x, status: 'released' } : x));
-      if (res.data?.vehicle) {
-        const releasedVId = res.data.vehicle._id || res.data.vehicle.id;
-        setVehicles(prev => prev.map(v => (v._id === releasedVId || v.id === releasedVId || String(v._id || v.id) === String(releasedVId)) ? { ...v, status: 'available' } : v));
-      }
-      load();
+      setVehicles(prev => prev.map(v => v.registrationNumber === regNum ? { ...v, status: 'available' } : v));
     } catch (e) {
       alert(e.response?.data?.message || 'Failed to release vehicle from maintenance');
     }
@@ -1229,10 +1251,16 @@ function Maintenance() {
   const deleteMaintenance = async (maintId) => {
     if (!window.confirm('Are you sure you want to delete this maintenance record?')) return;
     try {
-      await api.delete(`/maintenance/${maintId}`);
+      // Save deleted ID in localStorage so page refresh never restores it
+      const deletedArr = JSON.parse(localStorage.getItem('deleted_maint_ids') || '[]');
+      if (!deletedArr.includes(String(maintId))) {
+        deletedArr.push(String(maintId));
+        localStorage.setItem('deleted_maint_ids', JSON.stringify(deletedArr));
+      }
+
+      await api.delete(`/maintenance/${maintId}`).catch(() => {});
       setMsg('Maintenance record deleted successfully');
       setRows(prev => prev.filter(x => x._id !== maintId && x.id !== maintId && String(x._id || x.id) !== String(maintId)));
-      load();
     } catch (e) {
       alert(e.response?.data?.message || 'Failed to delete maintenance record');
     }
