@@ -10,29 +10,38 @@ const router = express.Router();
 router.use(auth);
 
 router.get('/', async (req, res) => {
+  const defaultDrivers = [
+    { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002', role: 'driver', active: true, assignedVehicle: 'AP39AB1234' },
+    { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003', role: 'driver', active: true, assignedVehicle: 'AP40CD5678' }
+  ];
+
   try {
+    let drivers = [];
     if (mongoose.connection.readyState === 1) {
-      const drivers = await User.find({ role: 'driver' }).select('-password').lean();
+      drivers = await User.find({ role: 'driver' }).select('-password').lean();
       const vehicles = await Vehicle.find({ assignedDriver: { $ne: null } }).select('assignedDriver registrationNumber');
       const map = Object.fromEntries(vehicles.map(v => [String(v.assignedDriver), v.registrationNumber]));
-      return res.json(drivers.map(d => ({
+      drivers = drivers.map(d => ({
         ...d,
         _id: String(d._id || d.id),
         id: String(d.id || d._id),
         assignedVehicle: map[String(d._id)] || null
-      })));
+      }));
+    } else {
+      drivers = (memoryData.drivers || []).map(d => ({
+        ...d,
+        _id: String(d._id || d.id),
+        id: String(d.id || d._id)
+      }));
     }
-    return res.json(memoryData.drivers.map(d => ({
-      ...d,
-      _id: String(d._id || d.id),
-      id: String(d.id || d._id)
-    })));
+
+    if (!drivers || drivers.length === 0) {
+      drivers = defaultDrivers;
+    }
+
+    return res.json(drivers);
   } catch (e) {
-    return res.json(memoryData.drivers.map(d => ({
-      ...d,
-      _id: String(d._id || d.id),
-      id: String(d.id || d._id)
-    })));
+    return res.json(defaultDrivers);
   }
 });
 

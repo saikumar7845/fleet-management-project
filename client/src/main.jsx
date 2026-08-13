@@ -839,25 +839,32 @@ const defaultBaselineDrivers = [
 ];
 
 const sanitizeDrivers = (driverList) => {
-  const base = (driverList && driverList.length > 0) ? driverList : defaultBaselineDrivers;
-  const merged = [...base];
+  const list = Array.isArray(driverList) && driverList.length > 0 ? driverList : defaultBaselineDrivers;
+  const merged = [...list];
 
   defaultBaselineDrivers.forEach(bd => {
-    if (!merged.some(m => String(m._id || m.id) === String(bd._id || bd.id) || (m.email && m.email === bd.email))) {
+    const bdId = String(bd._id || bd.id);
+    if (!merged.some(m => String(m._id || m.id) === bdId || (m.email && m.email.toLowerCase() === bd.email.toLowerCase()))) {
       merged.push(bd);
     }
   });
 
   const stored = getLocalDrivers();
-  stored.forEach(sd => {
-    const sId = String(sd._id || sd.id || '');
-    if (!merged.some(m => String(m._id || m.id || '') === sId || (m.email && m.email === sd.email))) {
-      merged.push(sd);
-    }
-  });
+  if (Array.isArray(stored)) {
+    stored.forEach(sd => {
+      const sId = String(sd._id || sd.id || '');
+      if (!merged.some(m => String(m._id || m.id || '') === sId || (m.email && sd.email && m.email.toLowerCase() === sd.email.toLowerCase()))) {
+        merged.push(sd);
+      }
+    });
+  }
+
+  if (merged.length === 0) {
+    merged.push(...defaultBaselineDrivers);
+  }
 
   return merged.map((d, idx) => {
-    const rawId = String(d._id || d.id || '');
+    const rawId = String(d._id || d.id || `d${idx + 1}`);
     let cleanId;
     if (/^d\d+$/i.test(rawId)) {
       cleanId = rawId.toLowerCase();
@@ -868,7 +875,14 @@ const sanitizeDrivers = (driverList) => {
     } else {
       cleanId = `d${idx + 1}`;
     }
-    return { ...d, _id: cleanId, id: cleanId, originalId: rawId };
+    return {
+      ...d,
+      _id: cleanId,
+      id: cleanId,
+      originalId: rawId,
+      name: d.name || 'Fleet Driver',
+      email: d.email || `driver${idx + 1}@fleet.com`
+    };
   });
 };
 
