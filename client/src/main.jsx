@@ -493,12 +493,25 @@ function Dashboard() {
   if (user()?.role === 'driver') return <DriverHome />;
   if (!d) return <div className="loading">Loading dashboard…</div>;
 
+  const releasedMaintIds = JSON.parse(localStorage.getItem('released_maint_ids') || '[]');
+  const releasedVRegs = JSON.parse(localStorage.getItem('released_vehicle_regs') || '[]');
+  const deletedMaintIds = JSON.parse(localStorage.getItem('deleted_maint_ids') || '[]');
+
+  const rawDueList = d.dueMaintenance || [];
+  const activeDueList = rawDueList.filter(item => {
+    const itemId = String(item.id || item._id || '');
+    const itemReg = item.registrationNumber || item.vehicleReg || '';
+    const isReleased = releasedMaintIds.includes(itemId) || releasedVRegs.includes(itemReg);
+    const isDeleted = deletedMaintIds.includes(itemId);
+    return !isReleased && !isDeleted;
+  });
+
   const counts = d.counts || {};
   const cards = [
     ['Vehicles', counts.vehicles ?? 0, CarFront],
     ['Trips', counts.trips ?? 0, RouteIcon],
     ['Distance', `${d.totalDistance ?? 0} km`, RouteIcon],
-    ['Maintenance Due', counts.dueMaintenance ?? 0, AlertTriangle]
+    ['Maintenance Due', activeDueList.length, AlertTriangle]
   ];
   
   const navItems = [
@@ -512,7 +525,6 @@ function Dashboard() {
   const totalFuel = (d.totalFuel ?? 0).toFixed(1);
   const totalMaintenanceCost = (d.totalMaintenanceCost ?? 0).toLocaleString();
   const byVehicle = d.byVehicle || [];
-  const dueMaintenance = d.dueMaintenance || [];
 
   return (
     <div>
@@ -569,13 +581,13 @@ function Dashboard() {
       </section>
       <div className="panel">
         <h3>Service Alerts</h3>
-        {dueMaintenance.length ? (
+        {activeDueList.length ? (
           <table>
             <thead>
               <tr><th>Vehicle</th><th>Last Service</th><th>Status</th></tr>
             </thead>
             <tbody>
-              {dueMaintenance.map(v => (
+              {activeDueList.map(v => (
                 <tr key={v.id || v._id || v.registrationNumber}>
                   <td><strong>{v.registrationNumber}</strong></td>
                   <td>{v.lastServiceDate ? new Date(v.lastServiceDate).toLocaleDateString() : '—'}</td>
