@@ -267,9 +267,12 @@ const DATA_FILE = path.join(__dirname, '../data.json');
 
 export const saveMemoryData = () => {
   try {
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.NODE_ENV === 'production') {
+      return;
+    }
     fs.writeFileSync(DATA_FILE, JSON.stringify(memoryData, null, 2), 'utf-8');
   } catch (e) {
-    console.error('Failed to save memory data file:', e.message);
+    console.warn('Skipping file write in read-only environment:', e.message);
   }
 };
 

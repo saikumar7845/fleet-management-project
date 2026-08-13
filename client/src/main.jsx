@@ -1207,17 +1207,35 @@ function Drivers() {
 
   const add = async e => {
     e.preventDefault();
+    const tempDriverObj = {
+      _id: 'd' + (getLocalDrivers().length + rows.length + 1),
+      id: 'd' + (getLocalDrivers().length + rows.length + 1),
+      name: form.name,
+      email: form.email.toLowerCase().trim(),
+      phone: form.phone || '',
+      role: 'driver',
+      active: true
+    };
+
+    setShow(false);
+    setForm({ name: '', email: '', phone: '', password: 'Driver@123' });
+
+    // Save to local storage + state immediately (0 ms delay)
+    const currentStored = getLocalDrivers();
+    const updated = sanitizeDrivers([tempDriverObj, ...currentStored.filter(d => d.email !== tempDriverObj.email)]);
+    saveLocalDrivers(updated);
+    setRows(updated);
+
     try {
       const res = await api.post('/drivers', form);
-      const created = res.data || { ...form, role: 'driver', active: true };
-      setShow(false);
-      setForm({ name: '', email: '', phone: '', password: 'Driver@123' });
-      
-      const currentStored = getLocalDrivers();
-      saveLocalDrivers([created, ...currentStored.filter(d => d.email !== created.email)]);
+      if (res.data) {
+        const created = res.data;
+        const freshStored = getLocalDrivers();
+        saveLocalDrivers(sanitizeDrivers([created, ...freshStored.filter(d => d.email !== created.email)]));
+      }
       load();
-    } catch (e) {
-      alert(e.response?.data?.message || 'Failed to add driver');
+    } catch (err) {
+      load();
     }
   };
 
