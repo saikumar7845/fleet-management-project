@@ -18,3 +18,4 @@ instance/
 .idea/
 
 .vercel
+server/data.json

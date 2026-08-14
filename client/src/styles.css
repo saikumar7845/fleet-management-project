@@ -1597,6 +1597,21 @@ button, .small {
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.1);
 }
 
+.error-banner {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
+}
+
 .cargo-text {
   display: flex;
   align-items: center;

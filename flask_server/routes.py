@@ -109,14 +109,29 @@ def create_vehicle():
     return jsonify(v.to_dict()), 201
 
 def _get_vehicle(v_id_param):
+    if not v_id_param:
+        return None
+    s_param = str(v_id_param).strip()
+    
     try:
-        v_id = int(v_id_param)
+        v_id = int(s_param)
         v = Vehicle.query.get(v_id)
         if v: return v
     except (ValueError, TypeError):
         pass
-    # Attempt lookup by registration number or string ID match if any
-    return Vehicle.query.filter_by(registration_number=str(v_id_param)).first()
+
+    if s_param.lower().startswith('v') and s_param[1:].isdigit():
+        try:
+            v_id = int(s_param[1:])
+            v = Vehicle.query.get(v_id)
+            if v: return v
+        except (ValueError, TypeError):
+            pass
+
+    v = Vehicle.query.filter_by(registration_number=s_param).first()
+    if v: return v
+
+    return Vehicle.query.filter(Vehicle.registration_number.ilike(s_param)).first()
 
 @vehicles_bp.route('/<vehicle_id>', methods=['DELETE'])
 @jwt_required()
@@ -356,13 +371,6 @@ def create_trip():
     )
     v.current_odometer += int(float(distance))
 
-    # Automatically return vehicle to available pool upon trip completion
-    v.assigned_driver_id = None
-    v.status = 'available'
-    v.load_status = 'unloaded'
-    v.current_load = 'Empty / Unloaded'
-    v.load_weight_kg = 0.0
-
     db.session.add(trip)
     db.session.commit()
     return jsonify(trip.to_dict()), 201
@@ -419,10 +427,6 @@ def create_maintenance():
     )
     v.last_service_date = s_dt
     v.status = 'maintenance'
-    v.assigned_driver_id = None
-    v.load_status = 'unloaded'
-    v.current_load = 'Empty / Unloaded'
-    v.load_weight_kg = 0.0
     db.session.add(rec)
     db.session.commit()
     return jsonify(rec.to_dict()), 201

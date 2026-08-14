@@ -35,12 +35,7 @@ router.post('/', auth, async (req, res) => {
       data.returnedVehicle = true;
       const trip = await Trip.create(data);
       await Vehicle.findByIdAndUpdate(vehicle._id, {
-        $inc: { currentOdometer: Number(data.distanceKm) || 0 },
-        assignedDriver: null,
-        status: 'available',
-        loadStatus: 'unloaded',
-        currentLoad: 'Empty / Unloaded',
-        loadWeightKg: 0
+        $inc: { currentOdometer: Number(data.distanceKm) || 0 }
       });
       return res.status(201).json(await trip.populate([{ path: 'driver', select: 'name' }, { path: 'vehicle', select: 'registrationNumber type' }]));
     }
@@ -49,11 +44,6 @@ router.post('/', auth, async (req, res) => {
     const targetV = memoryData.vehicles.find(v => v._id === data.vehicle || v.id === data.vehicle);
     if (targetV) {
       targetV.currentOdometer = (targetV.currentOdometer || 0) + (Number(data.distanceKm) || 0);
-      targetV.assignedDriver = null;
-      targetV.status = 'available';
-      targetV.loadStatus = 'unloaded';
-      targetV.currentLoad = 'Empty / Unloaded';
-      targetV.loadWeightKg = 0;
     }
 
     const newTrip = {

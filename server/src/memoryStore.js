@@ -8,11 +8,11 @@ export const memoryData = {
       purchaseDate: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0],
       lastServiceDate: new Date(Date.now() - 25 * 86400000).toISOString().split('T')[0],
       currentOdometer: 45200,
-      status: 'assigned',
-      assignedDriver: { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002' },
-      loadStatus: 'loaded',
-      currentLoad: 'Electronics Cargo',
-      loadWeightKg: 450
+      status: 'available',
+      assignedDriver: null,
+      loadStatus: 'unloaded',
+      currentLoad: 'Empty / Unloaded',
+      loadWeightKg: 0
     },
     {
       _id: 'v2',
@@ -22,8 +22,8 @@ export const memoryData = {
       purchaseDate: new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0],
       lastServiceDate: new Date(Date.now() - 105 * 86400000).toISOString().split('T')[0],
       currentOdometer: 38100,
-      status: 'assigned',
-      assignedDriver: { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003' },
+      status: 'available',
+      assignedDriver: null,
       loadStatus: 'unloaded',
       currentLoad: 'Empty / Unloaded',
       loadWeightKg: 0
@@ -53,7 +53,7 @@ export const memoryData = {
       phone: '9000000002',
       role: 'driver',
       active: true,
-      assignedVehicle: 'AP39AB1234'
+      assignedVehicle: null
     },
     {
       _id: 'd2',
@@ -63,7 +63,7 @@ export const memoryData = {
       phone: '9000000003',
       role: 'driver',
       active: true,
-      assignedVehicle: 'AP40CD5678'
+      assignedVehicle: null
     }
   ],
 
@@ -255,6 +255,7 @@ export const memoryData = {
       role: 'staff',
       phone: '9000000101'
     }
+  ]
 };
 
 import fs from 'fs';

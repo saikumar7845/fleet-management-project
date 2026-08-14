@@ -17,8 +17,8 @@ export async function seedInitialData(force = false) {
   const d2 = await User.create({ name: 'Priya Sharma', email: 'priya@fleet.com', password: await bcrypt.hash('Driver@123',10), role: 'driver', phone: '9000000003' });
   const today = new Date();
   const daysAgo = n => new Date(Date.now() - n*86400000);
-  const v1 = await Vehicle.create({ registrationNumber:'AP39AB1234', type:'Delivery Van', purchaseDate:daysAgo(900), lastServiceDate:daysAgo(25), currentOdometer:45200, status:'assigned', assignedDriver:driver._id });
-  const v2 = await Vehicle.create({ registrationNumber:'AP40CD5678', type:'Field Service Car', purchaseDate:daysAgo(600), lastServiceDate:daysAgo(105), currentOdometer:38100, status:'assigned', assignedDriver:d2._id });
+  const v1 = await Vehicle.create({ registrationNumber:'AP39AB1234', type:'Delivery Van', purchaseDate:daysAgo(900), lastServiceDate:daysAgo(25), currentOdometer:45200, status:'available', assignedDriver:null });
+  const v2 = await Vehicle.create({ registrationNumber:'AP40CD5678', type:'Field Service Car', purchaseDate:daysAgo(600), lastServiceDate:daysAgo(105), currentOdometer:38100, status:'available', assignedDriver:null });
   const v3 = await Vehicle.create({ registrationNumber:'AP41EF9012', type:'Pickup Truck', purchaseDate:daysAgo(1200), lastServiceDate:daysAgo(45), currentOdometer:67000, status:'available' });
   await Trip.create([
    { driver:driver._id, vehicle:v1._id, startLocation:'Vijayawada', endLocation:'Guntur', startTime:daysAgo(2), endTime:new Date(Date.now()-2*86400000+2*3600000), distanceKm:65, fuelUsedLitres:8 },

@@ -24,11 +24,11 @@ def seed_database():
         purchase_date=now - timedelta(days=900),
         last_service_date=now - timedelta(days=25),
         current_odometer=45200,
-        status='assigned',
-        assigned_driver_id=driver.id,
-        current_load='Electronics & Consumer Appliances',
-        load_weight_kg=450.0,
-        load_status='loaded'
+        status='available',
+        assigned_driver_id=None,
+        current_load='Empty / Unloaded',
+        load_weight_kg=0.0,
+        load_status='unloaded'
     )
     v2 = Vehicle(
         registration_number='AP40CD5678',
@@ -36,11 +36,11 @@ def seed_database():
         purchase_date=now - timedelta(days=600),
         last_service_date=now - timedelta(days=105),
         current_odometer=38100,
-        status='assigned',
-        assigned_driver_id=driver2.id,
-        current_load='Field Repair Tools & Spares',
-        load_weight_kg=120.0,
-        load_status='loaded'
+        status='available',
+        assigned_driver_id=None,
+        current_load='Empty / Unloaded',
+        load_weight_kg=0.0,
+        load_status='unloaded'
     )
     v3 = Vehicle(
         registration_number='AP41EF9012',

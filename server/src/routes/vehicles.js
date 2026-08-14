@@ -132,14 +132,24 @@ router.post('/:id/assign', async (req, res) => {
     if (!driverId) return res.status(400).json({ message: 'driverId is required' });
 
     if (mongoose.connection.readyState === 1) {
-      const driver = await User.findById(driverId);
-      if (!driver || driver.role !== 'driver') return res.status(400).json({ message: 'Driver not found' });
-      const vehicle = await Vehicle.findByIdAndUpdate(req.params.id, { assignedDriver: driver._id, status: 'assigned' }, { new: true }).populate('assignedDriver', 'name email phone');
-      if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
-      return res.json(vehicle);
+      let driver;
+      if (mongoose.Types.ObjectId.isValid(driverId)) {
+        driver = await User.findById(driverId);
+      }
+      if (!driver) {
+        driver = await User.findOne({ $or: [{ email: driverId }] });
+      }
+      let vehicle;
+      if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+        vehicle = await Vehicle.findByIdAndUpdate(req.params.id, { assignedDriver: driver ? driver._id : driverId, status: 'assigned' }, { new: true }).populate('assignedDriver', 'name email phone');
+      }
+      if (!vehicle) {
+        vehicle = await Vehicle.findOneAndUpdate({ registrationNumber: req.params.id }, { assignedDriver: driver ? driver._id : driverId, status: 'assigned' }, { new: true }).populate('assignedDriver', 'name email phone');
+      }
+      if (vehicle) return res.json(vehicle);
     }
 
-    const vIdx = memoryData.vehicles.findIndex(v => v._id === req.params.id || v.id === req.params.id || String(v._id || v.id) === String(req.params.id));
+    const vIdx = memoryData.vehicles.findIndex(v => v._id === req.params.id || v.id === req.params.id || v.registrationNumber === req.params.id || String(v._id || v.id) === String(req.params.id));
     if (vIdx !== -1) {
       const dObj = memoryData.drivers.find(d => d._id === driverId || d.id === driverId || String(d._id || d.id) === String(driverId));
       const driverData = dObj ? { _id: dObj._id || dObj.id, id: dObj._id || dObj.id, name: dObj.name, email: dObj.email, phone: dObj.phone } : driverId;
@@ -162,12 +172,17 @@ router.post('/:id/assign', async (req, res) => {
 router.post('/:id/unassign', async (req, res) => {
   try {
     if (mongoose.connection.readyState === 1) {
-      const vehicle = await Vehicle.findByIdAndUpdate(req.params.id, { assignedDriver: null, status: 'available', loadStatus: 'unloaded', currentLoad: 'Empty / Unloaded', loadWeightKg: 0 }, { new: true });
-      if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
-      return res.json(vehicle);
+      let vehicle;
+      if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+        vehicle = await Vehicle.findByIdAndUpdate(req.params.id, { assignedDriver: null, status: 'available', loadStatus: 'unloaded', currentLoad: 'Empty / Unloaded', loadWeightKg: 0 }, { new: true });
+      }
+      if (!vehicle) {
+        vehicle = await Vehicle.findOneAndUpdate({ registrationNumber: req.params.id }, { assignedDriver: null, status: 'available', loadStatus: 'unloaded', currentLoad: 'Empty / Unloaded', loadWeightKg: 0 }, { new: true });
+      }
+      if (vehicle) return res.json(vehicle);
     }
 
-    const vIdx = memoryData.vehicles.findIndex(v => v._id === req.params.id || v.id === req.params.id || String(v._id || v.id) === String(req.params.id));
+    const vIdx = memoryData.vehicles.findIndex(v => v._id === req.params.id || v.id === req.params.id || v.registrationNumber === req.params.id || String(v._id || v.id) === String(req.params.id));
     if (vIdx !== -1) {
       const vReg = memoryData.vehicles[vIdx].registrationNumber;
       memoryData.vehicles[vIdx].assignedDriver = null;
@@ -230,16 +245,17 @@ router.post('/:id/load', async (req, res) => {
     if (!cargoDesc) return res.status(400).json({ message: 'Cargo description is required for loading' });
 
     if (mongoose.connection.readyState === 1) {
-      const vehicle = await Vehicle.findByIdAndUpdate(req.params.id, {
-        currentLoad: cargoDesc,
-        loadWeightKg: weight,
-        loadStatus: 'loaded'
-      }, { new: true });
-      if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
-      return res.json({ message: 'Vehicle loaded successfully', vehicle });
+      let vehicle;
+      if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+        vehicle = await Vehicle.findByIdAndUpdate(req.params.id, { currentLoad: cargoDesc, loadWeightKg: weight, loadStatus: 'loaded' }, { new: true });
+      }
+      if (!vehicle) {
+        vehicle = await Vehicle.findOneAndUpdate({ registrationNumber: req.params.id }, { currentLoad: cargoDesc, loadWeightKg: weight, loadStatus: 'loaded' }, { new: true });
+      }
+      if (vehicle) return res.json({ message: 'Vehicle loaded successfully', vehicle });
     }
 
-    const vIdx = memoryData.vehicles.findIndex(v => v._id === req.params.id || v.id === req.params.id);
+    const vIdx = memoryData.vehicles.findIndex(v => v._id === req.params.id || v.id === req.params.id || v.registrationNumber === req.params.id || String(v._id || v.id) === String(req.params.id));
     if (vIdx !== -1) {
       const targetV = memoryData.vehicles[vIdx];
       targetV.currentLoad = cargoDesc;

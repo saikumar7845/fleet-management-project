@@ -341,7 +341,11 @@ function Login() {
                 </div>
 
                 {err && <div className="error-message">{err}</div>}
-                {msg && <div className="success-banner" style={{ marginBottom: '16px' }}><CheckCircle2 size={16} /> {msg}</div>}
+                {msg && (
+                  <div className={/error|failed|invalid|required/i.test(msg) ? "error-banner" : "success-banner"} style={{ marginBottom: '16px' }}>
+                    {/error|failed|invalid|required/i.test(msg) ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {msg}
+                  </div>
+                )}
 
                 <button type="submit" className="primary login-btn" disabled={loading}>
                   {loading ? (
@@ -427,7 +431,11 @@ function Login() {
               </div>
 
               {err && <div className="error-message">{err}</div>}
-              {msg && <div className="success-banner" style={{ marginBottom: '16px' }}><CheckCircle2 size={16} /> {msg}</div>}
+              {msg && (
+                <div className={/error|failed|invalid|required/i.test(msg) ? "error-banner" : "success-banner"} style={{ marginBottom: '16px' }}>
+                  {/error|failed|invalid|required/i.test(msg) ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {msg}
+                </div>
+              )}
 
               <button type="submit" className="primary login-btn" disabled={loading}>
                 {loading ? (
@@ -617,10 +625,38 @@ function LoadCargoModal({ vehicle, onClose, onSuccess }) {
     setLoading(true);
     setErr('');
     try {
-      await api.post(`/vehicles/${vehicle._id}/load`, {
+      const targetId = vehicle._id || vehicle.id || vehicle.registrationNumber;
+      const weightNum = Number(loadWeightKg) || 0;
+      const payload = {
         currentLoad,
-        loadWeightKg: Number(loadWeightKg) || 0
+        loadWeightKg: weightNum
+      };
+
+      const currentStored = getLocalVehicles();
+      const updated = (Array.isArray(currentStored) ? currentStored : []).map(v => {
+        if (
+          (v._id && (v._id === targetId || v._id === vehicle._id || v._id === vehicle.id)) ||
+          (v.registrationNumber && v.registrationNumber === vehicle.registrationNumber)
+        ) {
+          return {
+            ...v,
+            currentLoad,
+            loadWeightKg: weightNum,
+            loadStatus: 'loaded'
+          };
+        }
+        return v;
       });
+      saveLocalVehicles(updated);
+
+      try {
+        await api.post(`/vehicles/${targetId}/load`, payload);
+      } catch (err1) {
+        if (vehicle.registrationNumber && targetId !== vehicle.registrationNumber) {
+          await api.post(`/vehicles/${vehicle.registrationNumber}/load`, payload).catch(() => {});
+        }
+      }
+
       onSuccess();
       onClose();
     } catch (e) {
@@ -638,7 +674,7 @@ function LoadCargoModal({ vehicle, onClose, onSuccess }) {
             <Package size={22} className="code-modal-icon" style={{ color: '#10b981' }} />
             <div>
               <h3>Newly Load Vehicle: {vehicle.registrationNumber}</h3>
-              <p>Assign new cargo consignment details for the next trip</p>
+              <p>Enter cargo consignment details for the next trip</p>
             </div>
           </div>
           <button className="code-modal-close" onClick={onClose}><X size={18} /></button>
@@ -683,6 +719,95 @@ function LoadCargoModal({ vehicle, onClose, onSuccess }) {
   );
 }
 
+function AssignDriverModal({ vehicle, drivers, onClose, onSuccess }) {
+  const [selectedDriverId, setSelectedDriverId] = useState(drivers[0]?._id || drivers[0]?.id || '');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const submit = async e => {
+    e.preventDefault();
+    if (!selectedDriverId) {
+      setErr('Please select a driver from the options list.');
+      return;
+    }
+
+    const matched = drivers.find(d => 
+      String(d._id) === String(selectedDriverId) || 
+      String(d.id) === String(selectedDriverId) || 
+      String(d.originalId) === String(selectedDriverId)
+    );
+
+    if (!matched) {
+      setErr('Selected driver not found.');
+      return;
+    }
+
+    setLoading(true);
+    setErr('');
+    try {
+      const vId = vehicle._id || vehicle.id;
+      const targetDriverId = String(matched.originalId || matched._id || matched.id);
+      const assignedObj = { _id: matched._id, id: matched._id, name: matched.name, email: matched.email };
+
+      saveLocalAssignment(vId, vehicle.registrationNumber, assignedObj);
+
+      await api.post(`/vehicles/${vId}/assign`, { driverId: targetDriverId }).catch(() => {});
+      onSuccess(vId, vehicle.registrationNumber, assignedObj);
+      onClose();
+    } catch (e) {
+      setErr(e.response?.data?.message || 'Error assigning vehicle');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="code-modal-backdrop" onClick={onClose}>
+      <div className="code-modal-card cargo-modal" onClick={e => e.stopPropagation()}>
+        <div className="code-modal-header">
+          <div className="code-modal-title">
+            <Users size={22} className="code-modal-icon" style={{ color: '#2563eb' }} />
+            <div>
+              <h3>Assign Driver to Vehicle: {vehicle.registrationNumber}</h3>
+              <p>Select a driver from the options list below</p>
+            </div>
+          </div>
+          <button type="button" className="code-modal-close" onClick={onClose}><X size={18} /></button>
+        </div>
+
+        <form onSubmit={submit} className="cargo-form">
+          <div className="form-group">
+            <label>Driver Options</label>
+            <select 
+              value={selectedDriverId} 
+              onChange={e => setSelectedDriverId(e.target.value)} 
+              required
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '14px', background: '#fff', color: '#1e293b' }}
+            >
+              <option value="">-- Select Driver --</option>
+              {drivers.map(d => (
+                <option key={d._id || d.id} value={d._id || d.id}>
+                  {d.name} ({d.email || d._id})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {err && <div className="error">{err}</div>}
+
+          <div className="cargo-form-actions">
+            <button type="button" className="secondary-btn" onClick={onClose}>Cancel</button>
+            <button type="submit" className="primary" disabled={loading}>
+              <UserCheck size={16} />
+              <span>{loading ? 'Assigning...' : 'Assign Selected Driver'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function DriverHome() {
   const [v, setV] = useState([]);
   const [t, setT] = useState([]);
@@ -692,7 +817,13 @@ function DriverHome() {
   const load = () => {
     Promise.all([api.get('/vehicles'), api.get('/trips')])
       .then(([a, b]) => {
-        setV(a.data || []);
+        const rawV = a.data || [];
+        const processedV = applyAssignments(rawV).filter(x => {
+          const dObj = typeof x.assignedDriver === 'object' ? x.assignedDriver : null;
+          const dEmail = dObj?.email || x.assignedDriver;
+          return dEmail === currentUser?.email || x.assignedDriver === currentUser?.id || x.assignedDriver === currentUser?._id;
+        });
+        setV(processedV);
         setT(b.data || []);
       })
       .catch(() => {
@@ -845,9 +976,57 @@ const saveLocalVehicles = (list) => {
   try { localStorage.setItem('fleet_custom_vehicles', JSON.stringify(list)); } catch (e) {}
 };
 
+const getLocalAssignments = () => {
+  try { return JSON.parse(localStorage.getItem('fleet_vehicle_assignments') || '{}'); } catch (e) { return {}; }
+};
+
+const saveLocalAssignment = (vId, regNum, assignmentObj) => {
+  try {
+    const current = getLocalAssignments();
+    const cleanId = String(vId || '');
+    const cleanReg = String(regNum || '');
+    const val = assignmentObj === null 
+      ? { status: 'available', assignedDriver: null }
+      : { status: 'assigned', assignedDriver: assignmentObj };
+
+    if (cleanId) current[cleanId] = val;
+    if (cleanReg) current[cleanReg] = val;
+    localStorage.setItem('fleet_vehicle_assignments', JSON.stringify(current));
+
+    const customV = getLocalVehicles();
+    if (Array.isArray(customV) && customV.length > 0) {
+      const updatedCustom = customV.map(v => {
+        if ((cleanId && String(v._id || v.id || '') === cleanId) || (cleanReg && String(v.registrationNumber || '') === cleanReg)) {
+          return { ...v, status: val.status, assignedDriver: val.assignedDriver };
+        }
+        return v;
+      });
+      saveLocalVehicles(updatedCustom);
+    }
+  } catch (e) {}
+};
+
+const applyAssignments = (vehicleList) => {
+  if (!Array.isArray(vehicleList)) return [];
+  const assignments = getLocalAssignments();
+  return vehicleList.map(v => {
+    const key1 = String(v._id || v.id || '');
+    const key2 = String(v.registrationNumber || '');
+    const override = assignments[key1] || assignments[key2];
+    if (override) {
+      return {
+        ...v,
+        status: override.status,
+        assignedDriver: override.assignedDriver
+      };
+    }
+    return v;
+  });
+};
+
 const defaultBaselineDrivers = [
-  { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002', role: 'driver', active: true, assignedVehicle: 'AP39AB1234' },
-  { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003', role: 'driver', active: true, assignedVehicle: 'AP40CD5678' }
+  { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002', role: 'driver', active: true, assignedVehicle: null },
+  { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003', role: 'driver', active: true, assignedVehicle: null }
 ];
 
 const sanitizeDrivers = (driverList) => {
@@ -904,16 +1083,14 @@ function Vehicles() {
       _id: 'v1', id: 'v1', registrationNumber: 'AP39AB1234', type: 'Delivery Van',
       purchaseDate: new Date(Date.now() - 90 * 86400000).toISOString().split('T')[0],
       lastServiceDate: new Date(Date.now() - 25 * 86400000).toISOString().split('T')[0],
-      currentOdometer: 45200, status: 'assigned',
-      assignedDriver: { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002' },
-      loadStatus: 'loaded', currentLoad: 'Electronics Cargo', loadWeightKg: 450
+      currentOdometer: 45200, status: 'available', assignedDriver: null,
+      loadStatus: 'unloaded', currentLoad: 'Empty / Unloaded', loadWeightKg: 0
     },
     {
       _id: 'v2', id: 'v2', registrationNumber: 'AP40CD5678', type: 'Field Service Car',
       purchaseDate: new Date(Date.now() - 60 * 86400000).toISOString().split('T')[0],
       lastServiceDate: new Date(Date.now() - 105 * 86400000).toISOString().split('T')[0],
-      currentOdometer: 38100, status: 'assigned',
-      assignedDriver: { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003' },
+      currentOdometer: 38100, status: 'available', assignedDriver: null,
       loadStatus: 'unloaded', currentLoad: 'Empty / Unloaded', loadWeightKg: 0
     },
     {
@@ -926,13 +1103,14 @@ function Vehicles() {
   ];
 
   const defaultDrivers = [
-    { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002', role: 'driver', active: true, assignedVehicle: 'AP39AB1234' },
-    { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003', role: 'driver', active: true, assignedVehicle: 'AP40CD5678' }
+    { _id: 'd1', id: 'd1', name: 'Ravi Kumar', email: 'driver@fleet.com', phone: '9000000002', role: 'driver', active: true, assignedVehicle: null },
+    { _id: 'd2', id: 'd2', name: 'Priya Sharma', email: 'priya@fleet.com', phone: '9000000003', role: 'driver', active: true, assignedVehicle: null }
   ];
 
   const [rows, setRows] = useState(defaultVehicles);
   const [drivers, setDrivers] = useState(defaultDrivers);
   const [show, setShow] = useState(false);
+  const [selectedAssignVehicle, setSelectedAssignVehicle] = useState(null);
   const [selectedLoadVehicle, setSelectedLoadVehicle] = useState(null);
   const [form, setForm] = useState({ registrationNumber: '', type: '', purchaseDate: '', lastServiceDate: '', currentOdometer: 0 });
   const [msg, setMsg] = useState('');
@@ -947,7 +1125,7 @@ function Vehicles() {
         combined.push(sv);
       }
     });
-    return combined;
+    return applyAssignments(combined);
   };
 
   const load = () => Promise.all([api.get('/vehicles'), api.get('/drivers')])
@@ -981,66 +1159,30 @@ function Vehicles() {
     }
   };
 
-  const assignPrompt = async (vehicle) => {
-    const vId = vehicle._id || vehicle.id;
-    if (!drivers || drivers.length === 0) {
-      alert('No drivers available. Please add a driver first.');
-      return;
-    }
-
-    const driverListStr = drivers.map(d => `${d._id} - ${d.name}`).join('\n');
-
-    const input = prompt(`Enter driver ID (e.g. d1, d2, d3) or driver name:\n${driverListStr}`);
-    if (!input) return;
-
-    const cleanInput = input.trim().toLowerCase();
-    const matched = drivers.find(d => {
-      const dId = String(d._id).toLowerCase();
-      const rawId = String(d.originalId || d.id || '').toLowerCase();
-      const nameStr = String(d.name || '').toLowerCase();
-      return dId === cleanInput || 
-             dId === 'd' + cleanInput || 
-             rawId === cleanInput || 
-             rawId === 'd' + cleanInput || 
-             nameStr === cleanInput || 
-             nameStr.includes(cleanInput);
-    });
-
-    if (!matched) {
-      alert(`Driver "${input}" not found. Please enter a valid driver ID (e.g. d1, d2, d3) or driver name.`);
-      return;
-    }
-
-    const targetDriverId = String(matched.originalId || matched._id || matched.id);
-
-    // Instant optimistic UI update (0 ms response lag!)
+  const handleAssignSuccess = (vId, regNum, assignedObj) => {
     setRows(prev => prev.map(v => {
-      if ((v._id || v.id) === vId) {
+      if ((v._id || v.id) === vId || v.registrationNumber === regNum) {
         return {
           ...v,
           status: 'assigned',
-          assignedDriver: { _id: matched._id, id: matched._id, name: matched.name, email: matched.email }
+          assignedDriver: assignedObj
         };
       }
       return v;
     }));
-    setMsg(`Assigned driver ${matched.name} to vehicle ${vehicle.registrationNumber}`);
-
-    try {
-      await api.post(`/vehicles/${vId}/assign`, { driverId: targetDriverId });
-      load();
-    } catch (e) {
-      setMsg(e.response?.data?.message || 'Error assigning vehicle');
-      load();
-    }
+    setMsg(`Assigned driver ${assignedObj.name} to vehicle ${regNum}`);
+    load();
   };
 
   const unassign = async (id, regNum) => {
     if (!id) return;
     if (window.confirm(`Unassign driver from vehicle ${regNum}?`)) {
+      // Save persistent unassignment override so it NEVER reverts automatically
+      saveLocalAssignment(id, regNum, null);
+
       // Instant optimistic UI update (0 ms response lag!)
       setRows(prev => prev.map(v => {
-        if ((v._id || v.id) === id) {
+        if ((v._id || v.id) === id || v.registrationNumber === regNum) {
           return {
             ...v,
             status: 'available',
@@ -1102,7 +1244,11 @@ function Vehicles() {
       )}
       <div className="panel">
         <h3>Vehicles Fleet</h3>
-        {msg && <div className="success-banner"><CheckCircle2 size={16} /> {msg}</div>}
+        {msg && (
+          <div className={/error|failed|invalid|required/i.test(msg) ? "error-banner" : "success-banner"}>
+            {/error|failed|invalid|required/i.test(msg) ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {msg}
+          </div>
+        )}
         <table>
           <thead>
             <tr>
@@ -1148,11 +1294,12 @@ function Vehicles() {
                     </span>
                   </td>
                   <td className="action-buttons">
-                    <button className="btn-action small" onClick={() => assignPrompt(x)}>Assign</button>
+                    <button type="button" className="btn-action small" onClick={() => setSelectedAssignVehicle(x)}>Assign</button>
                     {isAssigned && (
-                      <button className="btn-action return-btn small" onClick={() => unassign(vId, x.registrationNumber)}>Unassign</button>
+                      <button type="button" className="btn-action return-btn small" onClick={() => unassign(vId, x.registrationNumber)}>Unassign</button>
                     )}
                     <button 
+                      type="button"
                       className="btn-action delete-vehicle-btn small" 
                       onClick={() => deleteVehicle(vId, x.registrationNumber)}
                       title="Delete vehicle from fleet"
@@ -1160,6 +1307,7 @@ function Vehicles() {
                       <Trash2 size={13} /> Delete
                     </button>
                     <button 
+                      type="button"
                       className="btn-action load-btn small" 
                       onClick={() => setSelectedLoadVehicle(x)}
                       title="Load new cargo onto vehicle"
@@ -1173,6 +1321,15 @@ function Vehicles() {
           </tbody>
         </table>
       </div>
+
+      {selectedAssignVehicle && (
+        <AssignDriverModal
+          vehicle={selectedAssignVehicle}
+          drivers={drivers}
+          onClose={() => setSelectedAssignVehicle(null)}
+          onSuccess={handleAssignSuccess}
+        />
+      )}
 
       {selectedLoadVehicle && (
         <LoadCargoModal 
@@ -1331,8 +1488,8 @@ function Trips() {
   ];
 
   const defaultVehicles = [
-    { _id: 'v1', id: 'v1', registrationNumber: 'AP39AB1234', type: 'Delivery Van', status: 'assigned', currentLoad: 'Electronics Cargo', loadWeightKg: 450 },
-    { _id: 'v2', id: 'v2', registrationNumber: 'AP40CD5678', type: 'Field Service Car', status: 'assigned', currentLoad: 'Empty / Unloaded', loadWeightKg: 0 },
+    { _id: 'v1', id: 'v1', registrationNumber: 'AP39AB1234', type: 'Delivery Van', status: 'available', currentLoad: 'Empty / Unloaded', loadWeightKg: 0 },
+    { _id: 'v2', id: 'v2', registrationNumber: 'AP40CD5678', type: 'Field Service Car', status: 'available', currentLoad: 'Empty / Unloaded', loadWeightKg: 0 },
     { _id: 'v3', id: 'v3', registrationNumber: 'AP41EF9012', type: 'Pickup Truck', status: 'available', currentLoad: 'Empty / Unloaded', loadWeightKg: 0 }
   ];
 
@@ -1431,9 +1588,9 @@ function Trips() {
           <input placeholder="Cargo / Load Details (e.g. 500kg Electronics)" value={form.cargoDetails} onChange={e => setForm({ ...form, cargoDetails: e.target.value })} />
           <input placeholder="Trip Notes" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
 
-          <button className="primary submit-trip-btn">
+          <button type="submit" className="primary submit-trip-btn">
             <CheckCircle2 size={16} />
-            <span>Log Trip (Auto-Completes & Unloads Vehicle)</span>
+            <span>Log Trip</span>
           </button>
         </form>
       )}
@@ -1503,8 +1660,8 @@ function Maintenance() {
   ];
 
   const defaultVehicles = [
-    { _id: 'v1', id: 'v1', registrationNumber: 'AP39AB1234', type: 'Delivery Van', status: 'assigned' },
-    { _id: 'v2', id: 'v2', registrationNumber: 'AP40CD5678', type: 'Field Service Car', status: 'assigned' },
+    { _id: 'v1', id: 'v1', registrationNumber: 'AP39AB1234', type: 'Delivery Van', status: 'available' },
+    { _id: 'v2', id: 'v2', registrationNumber: 'AP40CD5678', type: 'Field Service Car', status: 'available' },
     { _id: 'v3', id: 'v3', registrationNumber: 'AP41EF9012', type: 'Pickup Truck', status: 'available' }
   ];
 
@@ -1641,7 +1798,11 @@ function Maintenance() {
           <Plus size={17} /> Record Service
         </button>
       </div>
-      {msg && <div className="success-banner"><CheckCircle2 size={16} /> {msg}</div>}
+      {msg && (
+        <div className={/error|failed|invalid|required/i.test(msg) ? "error-banner" : "success-banner"}>
+          {/error|failed|invalid|required/i.test(msg) ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />} {msg}
+        </div>
+      )}
       {show && (
         <form className="panel formgrid" onSubmit={add}>
           <div className="form-group" style={{ gridColumn: '1 / -1' }}>

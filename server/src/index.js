@@ -45,7 +45,8 @@ app.use((err, req, res, next) => {
 
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
   const port = process.env.PORT || 5000;
-  connectDB().then(() => app.listen(port, () => console.log(`API running on http://localhost:${port}`)));
+  app.listen(port, () => console.log(`API running on http://localhost:${port}`));
+  connectDB().catch(err => console.error('DB connect error:', err.message));
 }
 
 export default app;
